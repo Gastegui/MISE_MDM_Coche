@@ -46,7 +46,7 @@ typedef struct
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NUM_TASKS 3
+#define NUM_TASKS 4
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -93,9 +93,11 @@ static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
+
 static task_retval task_led_example(void);
 static task_retval task_uart_tx_example(void);
 static task_retval task_uart_rx_example(void);
+static task_retval task_movement_example(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -145,6 +147,31 @@ static task_retval task_uart_rx_example(void)
   return TASK_OK;
 }
 
+uint8_t moviendo = 0;
+static task_retval task_movement_example(void)
+{
+  if(mover_coche && moviendo == 0)
+  {
+    moviendo = 1;
+    HAL_TIM_PWM_Start(&htim3, 1);
+    HAL_TIM_PWM_Start(&htim3, 3);
+    HAL_TIM_PWM_Start(&htim4, 1);
+    HAL_TIM_PWM_Start(&htim4, 3);
+  }
+  else if(!mover_coche && moviendo)
+  {
+    moviendo = 0;
+    HAL_TIM_PWM_Stop(&htim3, 1);
+    HAL_TIM_PWM_Stop(&htim3, 3);
+    HAL_TIM_PWM_Stop(&htim4, 1);
+    HAL_TIM_PWM_Stop(&htim4, 3);
+  }
+
+  return TASK_OK;
+}
+
+
+
 static void scheduler_error_handler(void)
 {
   char mensaje[] = {"Ha ocurrido un error\r\n"};
@@ -171,6 +198,7 @@ int main(void)
       {task_led_example, 500U, 0},
       {task_uart_tx_example, 1050U, 0},
       {task_uart_rx_example, 10U, 0},
+      {task_movement_example, 1U, 0},
   };
 
   /* USER CODE END 1 */
@@ -431,9 +459,9 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
+  htim3.Init.Prescaler = 83;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
+  htim3.Init.Period = 999;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -456,7 +484,7 @@ static void MX_TIM3_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -502,9 +530,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
+  htim4.Init.Prescaler = 83;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 65535;
+  htim4.Init.Period = 999;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -527,7 +555,7 @@ static void MX_TIM4_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
