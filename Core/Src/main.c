@@ -46,7 +46,7 @@ typedef struct
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NUM_TASKS 2
+#define NUM_TASKS 3
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -67,8 +67,16 @@ TIM_HandleTypeDef htim5;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
+
+//UART
+volatile uint8_t uart_rx_buff[20];
+volatile uint8_t uart_rx_pending = 0;
+
+//FLAGS MOVIMIENTO EXAMPLE
+uint8_t mover_coche = 0;
 
 /* USER CODE END PV */
 
@@ -87,10 +95,23 @@ static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 static task_retval task_led_example(void);
 static task_retval task_uart_tx_example(void);
+static task_retval task_uart_rx_example(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+  if(huart->Instance == USART2)
+  {
+    uart_rx_pending = 1;
+    uart_rx_buff[Size] = '\0';
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, uart_rx_buff, sizeof(uart_rx_buff));
+  }
+}
+
 static task_retval task_led_example(void)
 {
   HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
@@ -100,7 +121,7 @@ static task_retval task_led_example(void)
 static task_retval task_uart_tx_example(void)
 {
   char mensaje[40];
-  snprintf(mensaje, 40, "HAL_GetTick(): %lu\r\n", HAL_GetTick());
+  snprintf(mensaje, 40, "HAL_GetTick(): %lu, mover_coche: %u\r\n", HAL_GetTick(), mover_coche);
 
   if(HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
     return TASK_OK;
@@ -108,10 +129,27 @@ static task_retval task_uart_tx_example(void)
   return TASK_FAILED;
 }
 
+static task_retval task_uart_rx_example(void)
+{
+  if(uart_rx_pending)
+  {
+    if(strcmp(uart_rx_buff, "RETURN_FAILED") == 0)
+      return TASK_FAILED;
+    if(strcmp(uart_rx_buff, "MOVER ADELANTE") == 0)
+      mover_coche = 1;
+    if(strcmp(uart_rx_buff, "MOVER PARAR") == 0)
+      mover_coche = 0;
+
+    uart_rx_pending = 0;
+  }
+  return TASK_OK;
+}
+
 static void scheduler_error_handler(void)
 {
   char mensaje[] = {"Ha ocurrido un error\r\n"};
   HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY);
+  GPIOA->ODR |= 1U << 5;
   while(1)
   {
     HAL_IWDG_Refresh(&hiwdg);
@@ -132,6 +170,7 @@ int main(void)
   task_t tasks[NUM_TASKS] = {
       {task_led_example, 500U, 0},
       {task_uart_tx_example, 1050U, 0},
+      {task_uart_rx_example, 10U, 0},
   };
 
   /* USER CODE END 1 */
@@ -164,6 +203,8 @@ int main(void)
   MX_USART1_UART_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, uart_rx_buff, sizeof(uart_rx_buff));
 
   /* USER CODE END 2 */
 
@@ -631,8 +672,12 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
