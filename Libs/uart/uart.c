@@ -20,10 +20,10 @@ uint8_t UART_Send(const char * txt)
 {
   uint8_t return_value = 0;
 
-  if(HAL_UART_Transmit(&huart2, (uint8_t *)txt, strlen(txt), HAL_MAX_DELAY) != HAL_OK)
-  {
-    return_value = 1;
-  }
+//  if(HAL_UART_Transmit(&huart2, (uint8_t *)txt, strlen(txt), HAL_MAX_DELAY) != HAL_OK)
+//  {
+//    return_value = 1;
+//  }
 
 	return return_value;
 }

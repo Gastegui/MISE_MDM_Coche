@@ -22,16 +22,31 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+typedef enum
+{
+  TASK_OK,
+  TASK_FAILED
+}task_retval;
+
+typedef struct
+{
+  task_retval (*function)(void);
+  uint32_t period_ms;
+  uint32_t last_exec;
+} task_t;
+
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define NUM_TASKS 2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,6 +57,8 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
+
+IWDG_HandleTypeDef hiwdg;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -66,12 +83,40 @@ static void MX_TIM5_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
-
+static task_retval task_led_example(void);
+static task_retval task_uart_tx_example(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static task_retval task_led_example(void)
+{
+  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+  return TASK_OK;
+}
+
+static task_retval task_uart_tx_example(void)
+{
+  char mensaje[40];
+  snprintf(mensaje, 40, "HAL_GetTick(): %lu\r\n", HAL_GetTick());
+
+  if(HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
+    return TASK_OK;
+
+  return TASK_FAILED;
+}
+
+static void scheduler_error_handler(void)
+{
+  char mensaje[] = {"Ha ocurrido un error\r\n"};
+  HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY);
+  while(1)
+  {
+    HAL_IWDG_Refresh(&hiwdg);
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -83,6 +128,11 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
+  task_t tasks[NUM_TASKS] = {
+      {task_led_example, 500U, 0},
+      {task_uart_tx_example, 1050U, 0},
+  };
 
   /* USER CODE END 1 */
 
@@ -112,14 +162,26 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint8_t i;
   while (1)
   {
+    for(i = 0; i < NUM_TASKS; i++)
+    {
+      if(HAL_GetTick() - tasks[i].last_exec >= tasks[i].period_ms)
+      {
+        tasks[i].last_exec = HAL_GetTick();
+        if(tasks[i].function() != TASK_OK)
+          scheduler_error_handler();
+      }
+    }
+    HAL_IWDG_Refresh(&hiwdg);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -144,9 +206,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 16;
@@ -231,6 +294,34 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_64;
+  hiwdg.Init.Reload = 999;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
 
 }
 
