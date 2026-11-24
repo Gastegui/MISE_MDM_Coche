@@ -1,0 +1,56 @@
+
+# ==========================================
+# STM32CubeIDE / Eclipse
+# ==========================================
+
+# Configuración local del workspace
+.metadata/
+.settings/
+*.launch
+
+# Archivos temporales de Eclipse
+*.tmp
+*.bak
+*.swp
+*~
+
+# ==========================================
+# Build outputs
+# ==========================================
+
+Debug/
+Release/
+build/
+Build/
+
+# Binarios compilados
+*.o
+*.d
+*.elf
+*.hex
+*.bin
+*.map
+*.list
+*.lst
+
+# ==========================================
+# STM32CubeIDE generated files
+# ==========================================
+
+# Archivos de dependencias generados
+*.su
+
+# ==========================================
+# Sistema operativo
+# ==========================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# Otros
+# ==========================================
+
+*.log
+
