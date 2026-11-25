@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "motor.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -59,6 +59,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define PWM_ARR 4999
+#define PWM_CONVERSION 49
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
 #define BC_Pin GPIO_PIN_0

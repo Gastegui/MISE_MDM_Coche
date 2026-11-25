@@ -47,6 +47,12 @@ typedef struct
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define NUM_TASKS 4
+#define MOVE_FORWARD_MASK (1U << 0)
+#define MOVE_BACKWARD_MASK (1U << 1)
+#define MOVE_LEFT_MASK (1U << 2)
+#define MOVE_RIGHT_MASK (1U << 3)
+#define MOVE_TANK_RIGHT_MASK (1U << 4)
+#define MOVE_TANK_LEFT_MASK (1U << 5)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -75,8 +81,15 @@ DMA_HandleTypeDef hdma_usart2_rx;
 volatile uint8_t uart_rx_buff[20];
 volatile uint8_t uart_rx_pending = 0;
 
-//FLAGS MOVIMIENTO EXAMPLE
-uint8_t mover_coche = 0;
+//MOVIMIENTO EXAMPLE
+uint8_t move_order = 0;
+uint8_t move_speed = 0;
+
+//MOTORES
+motor_t motor_superior_izquierda;
+motor_t motor_inferior_izquierda;
+motor_t motor_inferior_derecha;
+motor_t motor_superior_derecha;
 
 /* USER CODE END PV */
 
@@ -110,7 +123,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   {
     uart_rx_pending = 1;
     uart_rx_buff[Size] = '\0';
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, uart_rx_buff, sizeof(uart_rx_buff));
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
   }
 }
 
@@ -123,7 +136,7 @@ static task_retval task_led_example(void)
 static task_retval task_uart_tx_example(void)
 {
   char mensaje[40];
-  snprintf(mensaje, 40, "HAL_GetTick(): %lu, mover_coche: %u\r\n", HAL_GetTick(), mover_coche);
+  snprintf(mensaje, 40, "HAL_GetTick(): %lu, speed: %u\r\n", HAL_GetTick(), move_speed);
 
   if(HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
     return TASK_OK;
@@ -135,36 +148,79 @@ static task_retval task_uart_rx_example(void)
 {
   if(uart_rx_pending)
   {
-    if(strcmp(uart_rx_buff, "RETURN_FAILED") == 0)
+    if(strcmp((char*)uart_rx_buff, "RETURN_FAILED") == 0)
       return TASK_FAILED;
-    if(strcmp(uart_rx_buff, "MOVER ADELANTE") == 0)
-      mover_coche = 1;
-    if(strcmp(uart_rx_buff, "MOVER PARAR") == 0)
-      mover_coche = 0;
+    else if(strncmp((char*)uart_rx_buff, "MOVE ", 5) == 0)
+    {
+      switch(uart_rx_buff[5])
+      {
+      case 'W':
+        move_order = MOVE_FORWARD_MASK;
+        break;
+      case 'S':
+        move_order = MOVE_BACKWARD_MASK;
+        break;
+      case 'A':
+        move_order = MOVE_LEFT_MASK;
+        break;
+      case 'D':
+        move_order = MOVE_RIGHT_MASK;
+        break;
+      case 'Q':
+        move_order = MOVE_TANK_LEFT_MASK;
+        break;
+      case 'E':
+        move_order = MOVE_TANK_RIGHT_MASK;
+        break;
+      case 'X':
+      default:
+        move_order = 0;
+        break;
+      }
+
+      sscanf((char*)uart_rx_buff + 7, "%hhu", &move_speed);
+    }
 
     uart_rx_pending = 0;
   }
   return TASK_OK;
 }
 
-uint8_t moviendo = 0;
 static task_retval task_movement_example(void)
 {
-  if(mover_coche && moviendo == 0)
+
+  if(move_order == 0)
   {
-    moviendo = 1;
-    HAL_TIM_PWM_Start(&htim3, 1);
-    HAL_TIM_PWM_Start(&htim3, 3);
-    HAL_TIM_PWM_Start(&htim4, 1);
-    HAL_TIM_PWM_Start(&htim4, 3);
+    MOTOR_update(&motor_superior_izquierda, 0, MOTOR_FORWARD);
+    MOTOR_update(&motor_superior_derecha, 0, MOTOR_FORWARD);
+    MOTOR_update(&motor_inferior_izquierda, 0, MOTOR_FORWARD);
+    MOTOR_update(&motor_inferior_derecha, 0, MOTOR_FORWARD);
   }
-  else if(!mover_coche && moviendo)
+  else
   {
-    moviendo = 0;
-    HAL_TIM_PWM_Stop(&htim3, 1);
-    HAL_TIM_PWM_Stop(&htim3, 3);
-    HAL_TIM_PWM_Stop(&htim4, 1);
-    HAL_TIM_PWM_Stop(&htim4, 3);
+    //Motor superior izquierda
+    if(move_order & (MOVE_FORWARD_MASK | MOVE_RIGHT_MASK | MOVE_TANK_RIGHT_MASK))
+      MOTOR_update(&motor_superior_izquierda, move_speed, MOTOR_FORWARD);
+    else
+      MOTOR_update(&motor_superior_izquierda, move_speed, MOTOR_BACKWARD);
+
+    //Motor superior derecha
+    if(move_order & (MOVE_FORWARD_MASK | MOVE_LEFT_MASK | MOVE_TANK_LEFT_MASK))
+      MOTOR_update(&motor_superior_derecha, move_speed, MOTOR_FORWARD);
+    else
+      MOTOR_update(&motor_superior_derecha, move_speed, MOTOR_BACKWARD);
+
+    //Motor inferior izquierda
+    if(move_order & (MOVE_FORWARD_MASK | MOVE_LEFT_MASK | MOVE_TANK_RIGHT_MASK))
+      MOTOR_update(&motor_inferior_izquierda, move_speed, MOTOR_FORWARD);
+    else
+      MOTOR_update(&motor_inferior_izquierda, move_speed, MOTOR_BACKWARD);
+
+    //Motor inferior derecha
+    if(move_order & (MOVE_FORWARD_MASK | MOVE_RIGHT_MASK | MOVE_TANK_LEFT_MASK))
+      MOTOR_update(&motor_inferior_derecha, move_speed, MOTOR_FORWARD);
+    else
+      MOTOR_update(&motor_inferior_derecha, move_speed, MOTOR_BACKWARD);
   }
 
   return TASK_OK;
@@ -201,6 +257,12 @@ int main(void)
       {task_movement_example, 1U, 0},
   };
 
+
+  MOTOR_create(&htim3, TIM_CHANNEL_1, TIM_CHANNEL_2, &motor_superior_izquierda);
+  MOTOR_create(&htim3, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_inferior_izquierda);
+  MOTOR_create(&htim4, TIM_CHANNEL_2, TIM_CHANNEL_1, &motor_inferior_derecha);
+  MOTOR_create(&htim4, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_superior_derecha);
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -232,7 +294,7 @@ int main(void)
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, uart_rx_buff, sizeof(uart_rx_buff));
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
 
   /* USER CODE END 2 */
 
@@ -461,9 +523,9 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 4999;
+  htim3.Init.Period = PWM_ARR;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
   {
     Error_Handler();
@@ -484,7 +546,7 @@ static void MX_TIM3_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 500;
+  sConfigOC.Pulse = 2500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -532,9 +594,9 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 0;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 4999;
+  htim4.Init.Period = PWM_ARR;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
   {
     Error_Handler();
@@ -555,7 +617,7 @@ static void MX_TIM4_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 500;
+  sConfigOC.Pulse = 2500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
