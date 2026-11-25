@@ -37,7 +37,7 @@ typedef enum
 typedef struct
 {
   task_retval (*function)(void);
-  uint32_t period_ms;
+  uint16_t period_ms;
   uint32_t last_exec;
 } task_t;
 
@@ -81,15 +81,9 @@ DMA_HandleTypeDef hdma_usart2_rx;
 volatile uint8_t uart_rx_buff[20];
 volatile uint8_t uart_rx_pending = 0;
 
-//MOVIMIENTO EXAMPLE
-uint8_t move_order = 0;
-uint8_t move_speed = 0;
-
-//MOTORES
-motor_t motor_superior_izquierda;
-motor_t motor_inferior_izquierda;
-motor_t motor_inferior_derecha;
-motor_t motor_superior_derecha;
+volatile uint8_t movimiento_colision_flag;
+volatile uint8_t movimiento_reset_flag;
+volatile uint8_t movimiento_uartTimeout_flag;
 
 /* USER CODE END PV */
 
@@ -135,8 +129,8 @@ static task_retval task_led_example(void)
 
 static task_retval task_uart_tx_example(void)
 {
-  char mensaje[40];
-  snprintf(mensaje, 40, "HAL_GetTick(): %lu, speed: %u\r\n", HAL_GetTick(), move_speed);
+  char mensaje[100];
+  snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %lu, Mov_uart_estado: %lu\r\n", HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado());
 
   if(HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
     return TASK_OK;
@@ -152,33 +146,37 @@ static task_retval task_uart_rx_example(void)
       return TASK_FAILED;
     else if(strncmp((char*)uart_rx_buff, "MOVE ", 5) == 0)
     {
+      uart_estado_t estado = UART_PARADO;
+      uint16_t move_speed = 0;
       switch(uart_rx_buff[5])
       {
       case 'W':
-        move_order = MOVE_FORWARD_MASK;
+        estado = UART_DELANTE;
         break;
       case 'S':
-        move_order = MOVE_BACKWARD_MASK;
+        estado = UART_ATRAS;
         break;
       case 'A':
-        move_order = MOVE_LEFT_MASK;
+        estado = UART_IZQUIERDA;
         break;
       case 'D':
-        move_order = MOVE_RIGHT_MASK;
+        estado = UART_DERECHA;
         break;
       case 'Q':
-        move_order = MOVE_TANK_LEFT_MASK;
+        estado = UART_TANQUE_IZQUIERDA;
         break;
       case 'E':
-        move_order = MOVE_TANK_RIGHT_MASK;
+        estado = UART_TANQUE_DERECHA;
         break;
       case 'X':
       default:
-        move_order = 0;
+        estado = UART_PARADO;
         break;
       }
 
-      sscanf((char*)uart_rx_buff + 7, "%hhu", &move_speed);
+      sscanf((char*)uart_rx_buff + 7, "%hu", &move_speed);
+
+      MOVIMIENTO_UART_CambiarEstado(estado, move_speed);
     }
 
     uart_rx_pending = 0;
@@ -189,39 +187,7 @@ static task_retval task_uart_rx_example(void)
 static task_retval task_movement_example(void)
 {
 
-  if(move_order == 0)
-  {
-    MOTOR_update(&motor_superior_izquierda, 0, MOTOR_FORWARD);
-    MOTOR_update(&motor_superior_derecha, 0, MOTOR_FORWARD);
-    MOTOR_update(&motor_inferior_izquierda, 0, MOTOR_FORWARD);
-    MOTOR_update(&motor_inferior_derecha, 0, MOTOR_FORWARD);
-  }
-  else
-  {
-    //Motor superior izquierda
-    if(move_order & (MOVE_FORWARD_MASK | MOVE_RIGHT_MASK | MOVE_TANK_RIGHT_MASK))
-      MOTOR_update(&motor_superior_izquierda, move_speed, MOTOR_FORWARD);
-    else
-      MOTOR_update(&motor_superior_izquierda, move_speed, MOTOR_BACKWARD);
-
-    //Motor superior derecha
-    if(move_order & (MOVE_FORWARD_MASK | MOVE_LEFT_MASK | MOVE_TANK_LEFT_MASK))
-      MOTOR_update(&motor_superior_derecha, move_speed, MOTOR_FORWARD);
-    else
-      MOTOR_update(&motor_superior_derecha, move_speed, MOTOR_BACKWARD);
-
-    //Motor inferior izquierda
-    if(move_order & (MOVE_FORWARD_MASK | MOVE_LEFT_MASK | MOVE_TANK_RIGHT_MASK))
-      MOTOR_update(&motor_inferior_izquierda, move_speed, MOTOR_FORWARD);
-    else
-      MOTOR_update(&motor_inferior_izquierda, move_speed, MOTOR_BACKWARD);
-
-    //Motor inferior derecha
-    if(move_order & (MOVE_FORWARD_MASK | MOVE_RIGHT_MASK | MOVE_TANK_LEFT_MASK))
-      MOTOR_update(&motor_inferior_derecha, move_speed, MOTOR_FORWARD);
-    else
-      MOTOR_update(&motor_inferior_derecha, move_speed, MOTOR_BACKWARD);
-  }
+  MOVIMIENTO_Actualizar();
 
   return TASK_OK;
 }
@@ -241,6 +207,13 @@ static void scheduler_error_handler(void)
 
 /* USER CODE END 0 */
 
+task_t tasks[NUM_TASKS] = {
+    {task_led_example, 500U, 0},
+    {task_uart_tx_example, 1050U, 0},
+    {task_uart_rx_example, 10U, 0},
+    {task_movement_example, 1U, 0},
+};
+
 /**
   * @brief  The application entry point.
   * @retval int
@@ -250,18 +223,8 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
-  task_t tasks[NUM_TASKS] = {
-      {task_led_example, 500U, 0},
-      {task_uart_tx_example, 1050U, 0},
-      {task_uart_rx_example, 10U, 0},
-      {task_movement_example, 1U, 0},
-  };
 
 
-  MOTOR_create(&htim3, TIM_CHANNEL_1, TIM_CHANNEL_2, &motor_superior_izquierda);
-  MOTOR_create(&htim3, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_inferior_izquierda);
-  MOTOR_create(&htim4, TIM_CHANNEL_2, TIM_CHANNEL_1, &motor_inferior_derecha);
-  MOTOR_create(&htim4, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_superior_derecha);
 
   /* USER CODE END 1 */
 
@@ -291,7 +254,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
-  MX_IWDG_Init();
+  //MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
@@ -312,7 +275,7 @@ int main(void)
           scheduler_error_handler();
       }
     }
-    HAL_IWDG_Refresh(&hiwdg);
+    //HAL_IWDG_Refresh(&hiwdg);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

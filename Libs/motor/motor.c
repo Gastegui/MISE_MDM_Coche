@@ -1,9 +1,10 @@
-/*
- * motor.c
- *
- *  Created on: 25 nov 2026
- *      Author: ehu
- */
+/** @file motor.c
+*
+* @brief A description of the module’s purpose.
+*
+* @author Julen Gallastegui de la Cruz
+* @author Andrea Nieto Gil
+*/
 
 #include "main.h"
 #include "motor.h"
@@ -33,10 +34,10 @@ void MOTOR_create(TIM_HandleTypeDef* timer, uint8_t channel_forwards, uint8_t ch
   stop_pwm(timer, channel_backwards);
 }
 
-uint8_t MOTOR_update(motor_t* motor, uint8_t speed, motor_direction direction)
+void MOTOR_update(motor_t* motor, uint8_t speed, motor_direction direction)
 {
   if(motor->speed == speed && motor->direction == direction)
-    return 0;
+    return;
 
   if(direction == MOTOR_FORWARD)
   {
@@ -51,5 +52,5 @@ uint8_t MOTOR_update(motor_t* motor, uint8_t speed, motor_direction direction)
 
   motor->speed = speed;
   motor->direction = direction;
-  return 0;
+  return;
 }

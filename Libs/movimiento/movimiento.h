@@ -9,6 +9,8 @@
 #ifndef MOVIMIENTO_H
 #define MOVIMIENTO_H
 
+#include <stdint.h>
+
 typedef enum
 {
   MOVIMIENTO_INIT = 0,
@@ -28,6 +30,21 @@ typedef enum
   UART_TANQUE_DERECHA
 } uart_estado_t;
 
+typedef union
+{
+  uint8_t raw;
+  struct
+  {
+    uint8_t forward : 1;
+    uint8_t backward : 1;
+    uint8_t left : 1;
+    uint8_t right : 1;
+    uint8_t tank_left : 1;
+    uint8_t tank_right : 1;
+    uint8_t unused : 2;
+  };
+} movimiento_union_t;
+
 typedef enum
 {
   JOYSTICK_INIT = 0,
@@ -36,8 +53,11 @@ typedef enum
 } joystick_estado_t;
 
 void MOVIMIENTO_Actualizar();
-void UART_Actualizar();
-void JOYSTICK_Actualizar();
+void MOVIMIENTO_UART_CambiarEstado(uart_estado_t nuevo, uint8_t speed);
+
+movimiento_estado_t MOVIMIENTO_Get_movimiento_estado();
+uart_estado_t MOVIMIENTO_Get_uart_estado();
+joystick_estado_t MOVIMIENTO_Get_joystick_estado();
 
 #endif /* MOVIMIENTO_H */
 

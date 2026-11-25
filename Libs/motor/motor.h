@@ -1,12 +1,13 @@
-/*
- * motor.h
- *
- *  Created on: 25 nov 2026
- *      Author: ehu
- */
+/** @file motor.h
+*
+* @brief A description of the module’s purpose.
+*
+* @author Julen Gallastegui de la Cruz
+* @author Andrea Nieto Gil
+*/
 
-#ifndef MOTOR_MOTOR_H_
-#define MOTOR_MOTOR_H_
+#ifndef MOTOR_MOTOR_H
+#define MOTOR_MOTOR_H
 
 typedef enum
 {
@@ -25,6 +26,6 @@ typedef struct
 
 void MOTOR_create(TIM_HandleTypeDef* timer, uint8_t channel_forwards, uint8_t channel_backwards, motor_t* output);
 
-uint8_t MOTOR_update(motor_t* motor, uint8_t speed, motor_direction direction);
+void MOTOR_update(motor_t* motor, uint8_t speed, motor_direction direction);
 
-#endif /* MOTOR_MOTOR_H_ */
+#endif /* MOTOR_MOTOR_H */
