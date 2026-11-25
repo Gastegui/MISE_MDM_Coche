@@ -27,14 +27,21 @@ uint8_t uart_velocidad_movimiento = 0;
 
 static movimiento_estado_t mov_estado = MOVIMIENTO_INIT;
 static uart_estado_t uart_estado_actual = UART_PARADO;
-static joystick_estado_t joystick_estado = JOYSTICK_INIT;
+static joystick_estado_t joystick_estado = JOYSTICK_GIRO;
 
 static motor_t motor_superior_izquierda;
 static motor_t motor_inferior_izquierda;
 static motor_t motor_inferior_derecha;
 static motor_t motor_superior_derecha;
 
-void UART_Actualizar();
+static void UART_Entrar();
+static void UART_Actualizar();
+static void JOYSTICK_Actualizar();
+static void MOVIMIENTO_InitMotores();
+static void MOVIMIENTO_PararMotores();
+static void MOVIMIENTO_EntryUart();
+static void MOVIMIENTO_EntryColision();
+
 
 movimiento_estado_t MOVIMIENTO_Get_movimiento_estado() { return mov_estado; }
 uart_estado_t MOVIMIENTO_Get_uart_estado() { return uart_estado_actual; }
@@ -49,48 +56,59 @@ void MOVIMIENTO_Actualizar()
   switch(mov_estado)
   {
   case MOVIMIENTO_INIT:
-    HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+    MOVIMIENTO_InitMotores();
+    MOVIMIENTO_EntryUart();
     mov_estado = MOVIMIENTO_UART;
-
-    MOTOR_create(&htim3, TIM_CHANNEL_1, TIM_CHANNEL_2, &motor_superior_izquierda);
-    MOTOR_create(&htim3, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_inferior_izquierda);
-    MOTOR_create(&htim4, TIM_CHANNEL_2, TIM_CHANNEL_1, &motor_inferior_derecha);
-    MOTOR_create(&htim4, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_superior_derecha);
-
     break;
 
   case MOVIMIENTO_UART:
-    if(movimiento_cambioModo_flag == 1)
+    if(movimiento_cambioModo_flag == 1 || movimiento_colision_flag == 1)
     {
-      HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
-      movimiento_cambioModo_flag = 0;
-      mov_estado = MOVIMIENTO_JOYSTICK;
-    }
-    else
-    {
-      UART_Actualizar();
-    }
-    if(movimiento_colision_flag)
-    {
-      HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-      movimiento_colision_flag = 0;
-      mov_estado = MOVIMIENTO_COLISION;
+      // Acciones al salir del estado UART
+      uart_estado_siguiente = UART_PARADO;
+      UART_Entrar();
+
+      if(movimiento_cambioModo_flag == 1)
+      {
+        HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+        movimiento_cambioModo_flag = 0;
+        mov_estado = MOVIMIENTO_JOYSTICK;
+      }
+      else
+      {
+        UART_Actualizar();
+      }
+      if(movimiento_colision_flag == 1)
+      {
+        MOVIMIENTO_EntryColision();
+      }
     }
     break;
 
   case MOVIMIENTO_JOYSTICK:
-    if(movimiento_cambioModo_flag == 1)
+    if(movimiento_cambioModo_flag == 1 || movimiento_colision_flag == 1)
     {
-      HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
-      movimiento_cambioModo_flag = 0;
-      mov_estado = MOVIMIENTO_UART;
-    }
-    if(movimiento_colision_flag)
-    {
-      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-      movimiento_colision_flag = 0;
-      mov_estado = MOVIMIENTO_COLISION;
+      // Acciones al salir del estado JOYSTICK
+      movimiento_joystickCambioModo_flag = 1;
+      joystick_estado = JOYSTICK_GIRO;
+      JOYSTICK_Actualizar();
+      MOVIMIENTO_PararMotores();
+
+      if(movimiento_cambioModo_flag == 1)
+      {
+        MOVIMIENTO_EntryUart();
+        movimiento_cambioModo_flag = 0;
+        mov_estado = MOVIMIENTO_UART;
+      }
+      else
+      {
+        JOYSTICK_Actualizar();
+      }
+      if(movimiento_colision_flag == 1)
+      {
+        MOVIMIENTO_EntryColision();
+      }
     }
     break;
 
@@ -98,9 +116,13 @@ void MOVIMIENTO_Actualizar()
     if(movimiento_reset_flag == 1)
     {
       HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+      MOVIMIENTO_EntryUart();
       movimiento_reset_flag = 0;
       mov_estado = MOVIMIENTO_UART;
+    }
+    else
+    {
+      // COMPLETAR: Activar el buzzer de alarma
     }
     break;
 
@@ -114,14 +136,12 @@ void MOVIMIENTO_Actualizar()
 static void UART_Entrar()
 {
   uart_estado_actual = uart_estado_siguiente;
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
   movimiento_union_t movimiento = {0};
 
   switch (uart_estado_actual)
   {
   case UART_PARADO:
     // COMPLETAR: desactivamos el timer del timeout
-    // COMPLETAR: paramos el coche
     break;
 
   case UART_IZQUIERDA:
@@ -161,10 +181,7 @@ static void UART_Entrar()
 
   if(movimiento.raw == 0)
   {
-    MOTOR_update(&motor_superior_izquierda, 0, MOTOR_FORWARD);
-    MOTOR_update(&motor_superior_derecha, 0, MOTOR_FORWARD);
-    MOTOR_update(&motor_inferior_izquierda, 0, MOTOR_FORWARD);
-    MOTOR_update(&motor_inferior_derecha, 0, MOTOR_FORWARD);
+    MOVIMIENTO_PararMotores();
   }
   else
   {
@@ -194,10 +211,11 @@ static void UART_Entrar()
   }
 }
 
-void UART_Actualizar()
+static void UART_Actualizar()
 {
   if(movimiento_uartComando_flag == 1)
   {
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
     UART_Entrar();
     movimiento_uartComando_flag = 0;
     movimiento_uartTimeout_flag = 0;
@@ -205,7 +223,8 @@ void UART_Actualizar()
   else if(movimiento_uartTimeout_flag == 1)
   {
     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-    uart_estado_actual = UART_PARADO;
+    uart_estado_siguiente = UART_PARADO;
+    UART_Entrar();
     movimiento_uartTimeout_flag = 0;
 
   }
@@ -218,7 +237,7 @@ void MOVIMIENTO_UART_CambiarEstado(uart_estado_t nuevo, uint8_t speed)
   uart_velocidad_movimiento = speed;
 }
 
-void JOYSTICK_Actualizar()
+static void JOYSTICK_Actualizar()
 {
   if(movimiento_joystickCambioModo_flag == 1)
   {
@@ -248,6 +267,37 @@ void JOYSTICK_Actualizar()
     joystick_estado = JOYSTICK_GIRO;
     break;
   }
+}
+
+static void MOVIMIENTO_InitMotores()
+{
+  MOTOR_create(&htim3, TIM_CHANNEL_1, TIM_CHANNEL_2, &motor_superior_izquierda);
+  MOTOR_create(&htim3, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_inferior_izquierda);
+  MOTOR_create(&htim4, TIM_CHANNEL_2, TIM_CHANNEL_1, &motor_inferior_derecha);
+  MOTOR_create(&htim4, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_superior_derecha);
+}
+
+static void MOVIMIENTO_PararMotores()
+{
+  MOTOR_update(&motor_superior_izquierda, 0, MOTOR_FORWARD);
+  MOTOR_update(&motor_superior_derecha, 0, MOTOR_FORWARD);
+  MOTOR_update(&motor_inferior_izquierda, 0, MOTOR_FORWARD);
+  MOTOR_update(&motor_inferior_derecha, 0, MOTOR_FORWARD);
+}
+
+static void MOVIMIENTO_EntryColision()
+{
+  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+  movimiento_colision_flag = 0;
+  mov_estado = MOVIMIENTO_COLISION;
+}
+
+static void MOVIMIENTO_EntryUart()
+{
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
 }
 
 /*** end of file ***/

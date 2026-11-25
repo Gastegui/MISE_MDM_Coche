@@ -47,8 +47,7 @@ typedef union
 
 typedef enum
 {
-  JOYSTICK_INIT = 0,
-  JOYSTICK_GIRO,
+  JOYSTICK_GIRO = 0,
   JOYSTICK_DIAGONAL
 } joystick_estado_t;
 
