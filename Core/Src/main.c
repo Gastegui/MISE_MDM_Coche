@@ -130,7 +130,7 @@ static task_retval task_led_example(void)
 static task_retval task_uart_tx_example(void)
 {
   char mensaje[100];
-  snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %lu, Mov_uart_estado: %lu\r\n", HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado());
+  snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %hu, Mov_uart_estado: %hu\r\n", HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado());
 
   if(HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
     return TASK_OK;
@@ -254,7 +254,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
-  //MX_IWDG_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
@@ -275,7 +275,7 @@ int main(void)
           scheduler_error_handler();
       }
     }
-    //HAL_IWDG_Refresh(&hiwdg);
+    HAL_IWDG_Refresh(&hiwdg);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
