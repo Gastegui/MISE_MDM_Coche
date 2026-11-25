@@ -16,10 +16,12 @@ extern volatile uint8_t movimiento_reset_flag;
 extern volatile uint8_t movimiento_uartComando_flag;
 extern volatile uint8_t movimiento_uartTimeout_flag;
 
+uint8_t movimiento_joystickCambioModo_flag;
+
 static movimiento_estado_t mov_estado = MOVIMIENTO_INIT;
 static uart_estado_t uart_estado_actual = UART_PARADO;
 static uart_estado_t uart_estado_siguiente = UART_PARADO;
-static joystick_estado_t joystick_estado = JOYSTICK_INIT;
+static joystick_estado_t joystick_estado = JOYSTICK_GIRO;
 
 /*!
 * @brief Actualiza la maquina de estados del movimiento del coche.
@@ -147,7 +149,34 @@ void UART_Actualizar()
 
 void JOYSTICK_Actualizar()
 {
+  if(movimiento_joystickCambioModo_flag == 1)
+  {
+    movimiento_joystickCambioModo_flag = 0;
 
+    if(joystick_estado == JOYSTICK_GIRO)
+    {
+      HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+      joystick_estado = JOYSTICK_DIAGONAL;
+    }
+    else
+    {
+      HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+      joystick_estado = JOYSTICK_GIRO;
+    }
+  }
+
+  switch(joystick_estado)
+  {
+  case JOYSTICK_GIRO:
+    // COMPLETAR: mover el coche en modo giro en funcion de la entrada del joystick
+    break;
+  case JOYSTICK_DIAGONAL:
+    // COMPLETAR: mover el coche en modo diagonal en funcion de la entrada del joystick
+    break;
+  default:
+    joystick_estado = JOYSTICK_GIRO;
+    break;
+  }
 }
 
 /*** end of file ***/
