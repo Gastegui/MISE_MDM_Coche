@@ -167,7 +167,10 @@ static task_retval_t task_polling_buttons(void)
   peticion = PULSADOR_Actualizar(&b1);
   if(peticion == 1)
   {
-    movimiento_cambioModo_flag = 1U;
+    if(MOVIMIENTO_Get_movimiento_estado() != MOVIMIENTO_COLISION)
+    {
+      movimiento_cambioModo_flag = 1U;
+    }
   }
 
   // Pulsamos BJ, cambio de modo de movimiento en maquina de estados de JOYSTICK
