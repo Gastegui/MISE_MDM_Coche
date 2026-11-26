@@ -123,6 +123,13 @@ static task_retval_t task_polling_buttons(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef * htim)
+{
+    if (htim->Instance == TIM5)
+    {
+      movimiento_uartTimeout_flag = 1U;
+    }
+}
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {

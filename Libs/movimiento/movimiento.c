@@ -42,6 +42,7 @@ static motor_t motor_inferior_derecha;
 static motor_t motor_superior_derecha;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim5;
 
 static void UART_Entrar();
 static void UART_Actualizar();
@@ -172,36 +173,36 @@ static void UART_Entrar()
   switch (uart_estado_actual)
   {
   case UART_PARADO:
-    // COMPLETAR: desactivamos el timer del timeout
+    HAL_TIM_Base_Stop_IT(&htim5);
     break;
 
   case UART_IZQUIERDA:
-    // COMPLETAR: activamos/actualizamos el timeout
+    HAL_TIM_Base_Start_IT(&htim5);
     movimiento.left = 1;
     break;
 
   case UART_TANQUE_IZQUIERDA:
-    // COMPLETAR: activamos/actualizamos el timeout
+    HAL_TIM_Base_Start_IT(&htim5);
     movimiento.tank_left = 1;
     break;
 
   case UART_DELANTE:
-    // COMPLETAR: activamos/actualizamos el timeout
+    HAL_TIM_Base_Start_IT(&htim5);
     movimiento.forward = 1;
     break;
 
   case UART_ATRAS:
-    // COMPLETAR: activamos/actualizamos el timeout
+    HAL_TIM_Base_Start_IT(&htim5);
     movimiento.backward = 1;
     break;
 
   case UART_DERECHA:
-    // COMPLETAR: activamos/actualizamos el timeout
+    HAL_TIM_Base_Start_IT(&htim5);
     movimiento.right = 1;
     break;
 
   case UART_TANQUE_DERECHA:
-    // COMPLETAR: activamos/actualizamos el timeout
+    HAL_TIM_Base_Start_IT(&htim5);
     movimiento.tank_right = 1;
     break;
 
@@ -328,13 +329,13 @@ static void JOYSTICK_Actualizar()
   switch(joystick_estado)
   {
   case JOYSTICK_GIRO:
-    // COMPLETAR: mover el coche en modo giro en funcion de la entrada del joystick
     convertir_ADC_a_PWM(joystick_y*2, 0, joystick_x*2);
     break;
+
   case JOYSTICK_DIAGONAL:
-    // COMPLETAR: mover el coche en modo diagonal en funcion de la entrada del joystick
-    convertir_ADC_a_PWM(joystick_y*2, joystick_x*2, 0); //MOVER ESTO AL DIAGONAL !!!!
+    convertir_ADC_a_PWM(joystick_y*2, joystick_x*2, 0);
     break;
+
   default:
     joystick_estado = JOYSTICK_GIRO;
     break;
