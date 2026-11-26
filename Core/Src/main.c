@@ -79,9 +79,9 @@ volatile uint8_t uart_rx_buff[20];
 volatile uint8_t uart_rx_pending = 0;
 
 //Movimiento
-volatile uint8_t movimiento_colision_flag;
-volatile uint8_t movimiento_reset_flag;
-volatile uint8_t movimiento_uartTimeout_flag;
+extern volatile uint8_t movimiento_colision_flag;
+extern volatile uint8_t movimiento_uartTimeout_flag;
+extern uint8_t movimiento_reset_flag;
 extern uint8_t movimiento_joystickCambioModo_flag;
 extern uint8_t movimiento_cambioModo_flag;
 
@@ -144,6 +144,14 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
   adc_full_flag = 1;
 }
 
+void EXTI0_IRQHandler(void)
+{
+  if(EXTI->PR & 1U << 0)
+  {
+    EXTI->PR |= 1U << 0; //La flag se borra con un write
+    movimiento_colision_flag = 1;
+  }
+}
 
 static task_retval_t task_polling_buttons(void)
 {
@@ -216,7 +224,7 @@ static task_retval_t task_uart_tx(void)
   return TASK_FAILED;
 }
 
-static task_retval_t task_uart_rx(void)
+static task_retval_t task_uart_rx(void) //TODO: METER EL COMANDO DEL RESET DE LA COLISION
 {
   if(uart_rx_pending)
   {
@@ -263,6 +271,10 @@ static task_retval_t task_uart_rx(void)
     else if(strcmp((char*)uart_rx_buff, "CHANGE_JOYSTICK") == 0)
     {
       movimiento_joystickCambioModo_flag = 1;
+    }
+    else if(strcmp((char*)uart_rx_buff, "COLISION_RESET") == 0)
+    {
+      movimiento_reset_flag = 1;
     }
     uart_rx_pending = 0;
   }
@@ -337,14 +349,21 @@ int main(void)
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
+  //Activar el DMA del UART RX
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
+
+  //Configurar las máquinas de estado de los botones
   PULSADOR_Init(&b1, PULSADOR_B1_REGISTRO, PULSADOR_B1_BIT);
   PULSADOR_Init(&bj, PULSADOR_BJ_REGISTRO, PULSADOR_BJ_BIT);
 
-
+  //Configurar el buffer y DMA del ADC
   memset((uint8_t*)adc_dma_buffer, 0, ADC_BUFFER_SIZE*sizeof(adc_dma_buffer[0]));
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, ADC_BUFFER_SIZE);
   HAL_TIM_Base_Start(&htim2);
+
+  //Activar la interrupción de las colisiones
+  NVIC_SetPriority(EXTI0_IRQn, 5);
+  NVIC_EnableIRQ(EXTI0_IRQn);
 
   /* USER CODE END 2 */
 
@@ -714,7 +733,7 @@ static void MX_TIM5_Init(void)
   htim5.Instance = TIM5;
   htim5.Init.Prescaler = 8399;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 9999;
+  htim5.Init.Period = 4999;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
@@ -859,7 +878,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : BC_Pin */
   GPIO_InitStruct.Pin = BC_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(BC_GPIO_Port, &GPIO_InitStruct);
 

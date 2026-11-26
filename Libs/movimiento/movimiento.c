@@ -10,32 +10,38 @@
 #include "main.h"
 #include <stdint.h>
 
-extern volatile uint8_t movimiento_colision_flag;
-extern volatile uint8_t movimiento_reset_flag;
-extern volatile uint8_t movimiento_uartTimeout_flag;
+//Flags desde interrupciones
+volatile uint8_t movimiento_colision_flag;
+volatile uint8_t movimiento_uartTimeout_flag;
 
+//Flags desde comandos de UART o botones sin interrupción
+uint8_t movimiento_reset_flag;
 uint8_t movimiento_joystickCambioModo_flag = 0U;
 uint8_t movimiento_cambioModo_flag = 0U;
-extern TIM_HandleTypeDef htim3;
-extern TIM_HandleTypeDef htim4;
-
 uint8_t movimiento_uartComando_flag = 0U;
+
+//Comandos del UART
 uart_estado_t uart_estado_siguiente = UART_PARADO;
 uint16_t uart_velocidad_movimiento = 0U;
 
+//Estados de las máquinas de estados
 static movimiento_estado_t mov_estado = MOVIMIENTO_INIT;
 static uart_estado_t uart_estado_actual = UART_PARADO;
 static joystick_estado_t joystick_estado = JOYSTICK_GIRO;
 
+//Valores de los joysticks
 static int16_t joystick_x;
 static int16_t joystick_y;
 #define JOYSTICK_DEADZONE 100
 #define JOYSTICK_CENTER 2100
 
+//Motores y PWM
 static motor_t motor_superior_izquierda;
 static motor_t motor_inferior_izquierda;
 static motor_t motor_inferior_derecha;
 static motor_t motor_superior_derecha;
+extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim4;
 
 static void UART_Entrar();
 static void UART_Actualizar();
