@@ -14,16 +14,15 @@ extern volatile uint8_t movimiento_colision_flag;
 extern volatile uint8_t movimiento_reset_flag;
 extern volatile uint8_t movimiento_uartTimeout_flag;
 
-uint8_t movimiento_joystickCambioModo_flag;
+uint8_t movimiento_joystickCambioModo_flag = 0U;
+uint8_t movimiento_cambioModo_flag = 0U;
 
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 
-uint8_t movimiento_cambioModo_flag;
-
-uint8_t movimiento_uartComando_flag;
+uint8_t movimiento_uartComando_flag = 0U;
 uart_estado_t uart_estado_siguiente = UART_PARADO;
-uint8_t uart_velocidad_movimiento = 0;
+uint8_t uart_velocidad_movimiento = 0U;
 
 static movimiento_estado_t mov_estado = MOVIMIENTO_INIT;
 static uart_estado_t uart_estado_actual = UART_PARADO;

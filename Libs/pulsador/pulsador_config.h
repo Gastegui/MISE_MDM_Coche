@@ -13,9 +13,9 @@
 
 /* Dónde está cada botón: registro de entrada (IDR) y número de bit.
    Pulsador a GND con pull-up: apretado = bit a 0 */
-#define PULSADOR_B2_REGISTRO    (&(GPIOA->IDR))     /* B2 = PA8 */
-#define PULSADOR_B2_BIT         8U
-#define PULSADOR_B3_REGISTRO    (&(GPIOB->IDR))     /* B3 = PB10 */
-#define PULSADOR_B3_BIT         10U
+#define PULSADOR_BJ_REGISTRO    (&(GPIOA->IDR))     /* BJ = PA8 */
+#define PULSADOR_BJ_BIT         8U
+#define PULSADOR_B1_REGISTRO    (&(GPIOC->IDR))     /* B1 = PC13 */
+#define PULSADOR_B1_BIT         13U
 
 #endif

@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include "pulsador.h"
+#include "movimiento.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,11 +34,11 @@ typedef enum
 {
   TASK_OK,
   TASK_FAILED
-}task_retval;
+}task_retval_t;
 
 typedef struct
 {
-  task_retval (*function)(void);
+  task_retval_t (*function)(void);
   uint16_t period_ms;
   uint32_t last_exec;
 } task_t;
@@ -81,9 +83,16 @@ DMA_HandleTypeDef hdma_usart2_rx;
 volatile uint8_t uart_rx_buff[20];
 volatile uint8_t uart_rx_pending = 0;
 
+//FLAGS
 volatile uint8_t movimiento_colision_flag;
 volatile uint8_t movimiento_reset_flag;
 volatile uint8_t movimiento_uartTimeout_flag;
+extern uint8_t movimiento_joystickCambioModo_flag;
+extern uint8_t movimiento_cambioModo_flag;
+
+//BOTONES
+static pulsador_t b1, bj;
+static uint8_t peticion = 0U;
 
 /* USER CODE END PV */
 
@@ -100,11 +109,10 @@ static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
-
-static task_retval task_led_example(void);
-static task_retval task_uart_tx_example(void);
-static task_retval task_uart_rx_example(void);
-static task_retval task_movement_example(void);
+static task_retval_t task_polling_buttons(void);
+static task_retval_t task_uart_tx_example(void);
+static task_retval_t task_uart_rx_example(void);
+static task_retval_t task_movement_example(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -121,13 +129,30 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   }
 }
 
-static task_retval task_led_example(void)
+static task_retval_t task_polling_buttons(void)
 {
-  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+  // Pulsamos B1, cambio de modo de movimiento en maquina de estados de MOVIMIENTO
+  peticion = PULSADOR_Actualizar(&b1);
+  if(peticion == 1)
+  {
+    movimiento_cambioModo_flag = 1U;
+  }
+
+  // Pulsamos BJ, cambio de modo de movimiento en maquina de estados de JOYSTICK
+  peticion = PULSADOR_Actualizar(&bj);
+  if(peticion == 1)
+  {
+    if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_JOYSTICK)
+    {
+      movimiento_joystickCambioModo_flag = 1U;
+    }
+}
+
   return TASK_OK;
 }
 
-static task_retval task_uart_tx_example(void)
+
+static task_retval_t task_uart_tx_example(void)
 {
   char mensaje[100];
   snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %hu, Mov_uart_estado: %hu\r\n", HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado());
@@ -138,7 +163,7 @@ static task_retval task_uart_tx_example(void)
   return TASK_FAILED;
 }
 
-static task_retval task_uart_rx_example(void)
+static task_retval_t task_uart_rx_example(void)
 {
   if(uart_rx_pending)
   {
@@ -184,7 +209,7 @@ static task_retval task_uart_rx_example(void)
   return TASK_OK;
 }
 
-static task_retval task_movement_example(void)
+static task_retval_t task_movement_example(void)
 {
 
   MOVIMIENTO_Actualizar();
@@ -207,13 +232,6 @@ static void scheduler_error_handler(void)
 
 /* USER CODE END 0 */
 
-task_t tasks[NUM_TASKS] = {
-    {task_led_example, 500U, 0},
-    {task_uart_tx_example, 1050U, 0},
-    {task_uart_rx_example, 10U, 0},
-    {task_movement_example, 1U, 0},
-};
-
 /**
   * @brief  The application entry point.
   * @retval int
@@ -222,9 +240,12 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
-
-
+  task_t tasks[NUM_TASKS] = {
+    {task_polling_buttons, 5U, 0},
+    {task_uart_tx_example, 1050U, 0},
+    {task_uart_rx_example, 10U, 0},
+    {task_movement_example, 1U, 0},
+  };
 
   /* USER CODE END 1 */
 
@@ -258,6 +279,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
+  PULSADOR_Init(&b1, PULSADOR_B1_REGISTRO, PULSADOR_B1_BIT);
+  PULSADOR_Init(&bj, PULSADOR_BJ_REGISTRO, PULSADOR_BJ_BIT);
 
   /* USER CODE END 2 */
 
