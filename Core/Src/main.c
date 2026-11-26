@@ -50,6 +50,10 @@ typedef struct
 /* USER CODE BEGIN PD */
 #define NUM_TASKS 5
 #define ADC_BUFFER_SIZE 100
+
+#define USART_TO_USE &huart2
+#define USART_DMA USART2
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -70,6 +74,7 @@ TIM_HandleTypeDef htim5;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
@@ -133,11 +138,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef * htim)
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-  if(huart->Instance == USART2)
+  if(huart->Instance == USART_DMA)
   {
     uart_rx_pending = 1;
     uart_rx_buff[Size] = '\0';
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
+    HAL_UARTEx_ReceiveToIdle_DMA(USART_TO_USE, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
   }
 }
 
@@ -229,7 +234,7 @@ static task_retval_t task_uart_tx(void)
       HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado(), (uint8_t)MOVIMIENTO_Get_joystick_estado(),
       MOVIMIENTO_Get_Joystick_X(), MOVIMIENTO_Get_Joystick_Y());
 
-  if(HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
+  if(HAL_UART_Transmit(USART_TO_USE, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
     return TASK_OK;
 
   return TASK_FAILED;
@@ -239,7 +244,7 @@ static task_retval_t task_uart_rx(void)
 {
   if(uart_rx_pending)
   {
-    if(strcmp((char*)uart_rx_buff, "RETURN_FAILED") == 0)
+    if(strncmp((char*)uart_rx_buff, "RETURN_FAILED", 13) == 0)
       return TASK_FAILED;
     else if(strncmp((char*)uart_rx_buff, "MOVE ", 5) == 0)
     {
@@ -276,17 +281,17 @@ static task_retval_t task_uart_rx(void)
       if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_UART)
         MOVIMIENTO_UART_CambiarEstado(estado, move_speed * PWM_CONVERSION);
     }
-    else if(strcmp((char*)uart_rx_buff, "CHANGE_MOVE_MODE") == 0)
+    else if(strncmp((char*)uart_rx_buff, "CHANGE_MOVE_MODE", 16) == 0)
     {
       if(MOVIMIENTO_Get_movimiento_estado() != MOVIMIENTO_COLISION)
         movimiento_cambioModo_flag = 1;
     }
-    else if(strcmp((char*)uart_rx_buff, "CHANGE_JOYSTICK") == 0)
+    else if(strncmp((char*)uart_rx_buff, "CHANGE_JOYSTICK", 15) == 0)
     {
       if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_JOYSTICK)
         movimiento_joystickCambioModo_flag = 1;
     }
-    else if(strcmp((char*)uart_rx_buff, "COLISION_RESET") == 0)
+    else if(strncmp((char*)uart_rx_buff, "COLISION_RESET", 14) == 0)
     {
       if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_COLISION)
         movimiento_reset_flag = 1;
@@ -306,7 +311,7 @@ static task_retval_t task_movement(void)
 static void scheduler_error_handler(void)
 {
   char mensaje[] = {"Ha ocurrido un error\r\n"};
-  HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY);
+  HAL_UART_Transmit(USART_TO_USE, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY);
   GPIOA->ODR |= 1U << 5;
   while(1)
   {
@@ -327,7 +332,7 @@ int main(void)
 
   task_t tasks[NUM_TASKS] = {
       {task_movement, 1U, 0},
-      {task_uart_tx, 100U, 0},
+      {task_uart_tx, 1000U, 0},
       {task_uart_rx, 50U, 0},
       {task_adc, 5U, 0},
       {task_polling_buttons, 5U, 0},
@@ -367,14 +372,14 @@ int main(void)
   if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != 0U)
   {
     char texto_watchdog[] = {"Watchdog got tripped\r\n"};
-    HAL_UART_Transmit(&huart2, (uint8_t *)texto_watchdog,
+    HAL_UART_Transmit(USART_TO_USE, (uint8_t *)texto_watchdog,
             (uint16_t)strlen(texto_watchdog), HAL_MAX_DELAY);
     char input[20];
     strcpy(input, "");
     while(1)
     {
       HAL_IWDG_Refresh(&hiwdg);
-      HAL_UART_Receive(&huart2, (uint8_t*)input, sizeof(input), 500);
+      HAL_UART_Receive(USART_TO_USE, (uint8_t*)input, sizeof(input), 500);
       HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
       if(strncmp(input, "RESUME", 6) == 0)
         break;
@@ -391,7 +396,7 @@ int main(void)
 
 
   //Activar el DMA del UART RX
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
+  HAL_UARTEx_ReceiveToIdle_DMA(USART_TO_USE, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
 
   //Configurar las máquinas de estado de los botones
   PULSADOR_Init(&b1, PULSADOR_B1_REGISTRO, PULSADOR_B1_BIT);
@@ -881,6 +886,9 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+  /* DMA2_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
 
 }
 

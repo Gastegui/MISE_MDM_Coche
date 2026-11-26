@@ -46,7 +46,7 @@ extern TIM_HandleTypeDef htim5;
 
 //Buzzer
 #define BUZZER_COLISION_PERIOD 250U
-#define BUZZER_BACKWARDS_PERIOD 100U
+#define BUZZER_BACKWARDS_PERIOD 400U
 static uint32_t buzzer_last_time = 0;
 
 static void UART_Entrar();
@@ -272,7 +272,8 @@ static void UART_Actualizar()
     UART_Entrar();
     movimiento_uartTimeout_flag = 0;
   }
-  else if (uart_estado_actual == UART_ATRAS)
+
+  if (uart_estado_actual == UART_ATRAS)
   {
     if(HAL_GetTick() - buzzer_last_time >= BUZZER_BACKWARDS_PERIOD)
     {
