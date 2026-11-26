@@ -247,14 +247,14 @@ static void UART_Actualizar()
 {
   if(movimiento_uartComando_flag == 1)
   {
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
     UART_Entrar();
     movimiento_uartComando_flag = 0;
     movimiento_uartTimeout_flag = 0;
   }
   else if(movimiento_uartTimeout_flag == 1)
   {
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
     uart_estado_siguiente = UART_PARADO;
     UART_Entrar();
     movimiento_uartTimeout_flag = 0;
