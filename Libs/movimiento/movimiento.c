@@ -46,7 +46,7 @@ extern TIM_HandleTypeDef htim5;
 
 //Buzzer
 #define BUZZER_COLISION_PERIOD 250U
-#define BUZZER_BACKWARDS_PERIOD 500U
+#define BUZZER_BACKWARDS_PERIOD 100U
 static uint32_t buzzer_last_time = 0;
 
 static void UART_Entrar();
@@ -178,8 +178,8 @@ void MOVIMIENTO_Actualizar()
 /* Acción al entrar:  */
 static void UART_Entrar()
 {
-  uart_estado_actual = uart_estado_siguiente;
   movimiento_union_t movimiento = {0};
+  uart_estado_actual = uart_estado_siguiente;
 
   switch (uart_estado_actual)
   {
@@ -258,6 +258,7 @@ static void UART_Actualizar()
 {
   if(movimiento_uartComando_flag == 1)
   {
+    HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
     UART_Entrar();
     movimiento_uartComando_flag = 0;
@@ -265,6 +266,7 @@ static void UART_Actualizar()
   }
   else if(movimiento_uartTimeout_flag == 1)
   {
+    HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
     uart_estado_siguiente = UART_PARADO;
     UART_Entrar();
