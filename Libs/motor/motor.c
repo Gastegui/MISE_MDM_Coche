@@ -34,7 +34,7 @@ void MOTOR_create(TIM_HandleTypeDef* timer, uint8_t channel_forwards, uint8_t ch
   stop_pwm(timer, channel_backwards);
 }
 
-void MOTOR_update(motor_t* motor, uint8_t speed, motor_direction direction)
+void MOTOR_update(motor_t* motor, uint16_t speed, motor_direction direction)
 {
   if(motor->speed == speed && motor->direction == direction)
     return;
@@ -42,12 +42,12 @@ void MOTOR_update(motor_t* motor, uint8_t speed, motor_direction direction)
   if(direction == MOTOR_FORWARD)
   {
     stop_pwm(motor->timer, motor->channel_backwards);
-    set_pwm(motor->timer, motor->channel_forwards, speed * PWM_CONVERSION);
+    set_pwm(motor->timer, motor->channel_forwards, speed);
   }
   else
   {
     stop_pwm(motor->timer, motor->channel_forwards);
-    set_pwm(motor->timer, motor->channel_backwards, speed * PWM_CONVERSION);
+    set_pwm(motor->timer, motor->channel_backwards, speed);
   }
 
   motor->speed = speed;

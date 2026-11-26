@@ -52,11 +52,17 @@ typedef enum
 } joystick_estado_t;
 
 void MOVIMIENTO_Actualizar();
-void MOVIMIENTO_UART_CambiarEstado(uart_estado_t nuevo, uint8_t speed);
+void MOVIMIENTO_UART_CambiarEstado(uart_estado_t nuevo, uint16_t speed);
 
 movimiento_estado_t MOVIMIENTO_Get_movimiento_estado();
 uart_estado_t MOVIMIENTO_Get_uart_estado();
 joystick_estado_t MOVIMIENTO_Get_joystick_estado();
+
+
+int16_t MOVIMIENTO_Get_Joystick_X();
+int16_t MOVIMIENTO_Get_Joystick_Y();
+void MOVIMIENTO_Set_Joystick_X(uint16_t valor);
+void MOVIMIENTO_Set_Joystick_Y(uint16_t valor);
 
 #endif /* MOVIMIENTO_H */
 

@@ -48,13 +48,8 @@ typedef struct
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NUM_TASKS 4
-#define MOVE_FORWARD_MASK (1U << 0)
-#define MOVE_BACKWARD_MASK (1U << 1)
-#define MOVE_LEFT_MASK (1U << 2)
-#define MOVE_RIGHT_MASK (1U << 3)
-#define MOVE_TANK_RIGHT_MASK (1U << 4)
-#define MOVE_TANK_LEFT_MASK (1U << 5)
+#define NUM_TASKS 5
+#define ADC_BUFFER_SIZE 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -83,7 +78,7 @@ DMA_HandleTypeDef hdma_usart2_rx;
 volatile uint8_t uart_rx_buff[20];
 volatile uint8_t uart_rx_pending = 0;
 
-//FLAGS
+//Movimiento
 volatile uint8_t movimiento_colision_flag;
 volatile uint8_t movimiento_reset_flag;
 volatile uint8_t movimiento_uartTimeout_flag;
@@ -93,6 +88,14 @@ extern uint8_t movimiento_cambioModo_flag;
 //BOTONES
 static pulsador_t b1, bj;
 static uint8_t peticion = 0U;
+
+extern uint8_t movimiento_cambioModo_flag;
+extern uint8_t movimiento_joystickCambioModo_flag;
+
+//ADC
+volatile uint16_t adc_dma_buffer[ADC_BUFFER_SIZE];
+volatile uint8_t adc_half_flag = 0;
+volatile uint8_t adc_full_flag = 0;
 
 /* USER CODE END PV */
 
@@ -109,10 +112,12 @@ static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
+
+static task_retval_t task_uart_tx(void);
+static task_retval_t task_uart_rx(void);
+static task_retval_t task_movement(void);
+static task_retval_t task_adc(void);
 static task_retval_t task_polling_buttons(void);
-static task_retval_t task_uart_tx_example(void);
-static task_retval_t task_uart_rx_example(void);
-static task_retval_t task_movement_example(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -128,6 +133,17 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
   }
 }
+
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
+{
+  adc_half_flag = 1;
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+  adc_full_flag = 1;
+}
+
 
 static task_retval_t task_polling_buttons(void)
 {
@@ -146,16 +162,53 @@ static task_retval_t task_polling_buttons(void)
     {
       movimiento_joystickCambioModo_flag = 1U;
     }
-}
+  }
 
   return TASK_OK;
 }
 
 
-static task_retval_t task_uart_tx_example(void)
+
+static task_retval_t task_adc(void)
+{
+  uint8_t start;
+  if(adc_half_flag)
+  {
+    start = 0;
+    adc_half_flag = 0;
+  }
+  else if(adc_full_flag)
+  {
+    start = ADC_BUFFER_SIZE/2;
+    adc_full_flag = 0;
+  }
+  else
+    return TASK_OK;
+
+  uint32_t x = 0;
+  uint32_t y = 0;
+
+  for(uint8_t i = start; i < start + ADC_BUFFER_SIZE/2; i++)
+  {
+    x += adc_dma_buffer[i];
+    y += adc_dma_buffer[++i];
+  }
+
+  x /= (ADC_BUFFER_SIZE/4);
+  y /= (ADC_BUFFER_SIZE/4);
+
+  MOVIMIENTO_Set_Joystick_X(x);
+  MOVIMIENTO_Set_Joystick_Y(y);
+
+  return TASK_OK;
+}
+
+static task_retval_t task_uart_tx(void)
 {
   char mensaje[100];
-  snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %hu, Mov_uart_estado: %hu\r\n", HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado());
+  snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %hu, Mov_uart_estado: %hu, Mov_Joy_estado: %hu, Joy_X: %i, Joy_Y: %i\r\n",
+      HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado(), (uint8_t)MOVIMIENTO_Get_joystick_estado(),
+      MOVIMIENTO_Get_Joystick_X(), MOVIMIENTO_Get_Joystick_Y());
 
   if(HAL_UART_Transmit(&huart2, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
     return TASK_OK;
@@ -163,7 +216,7 @@ static task_retval_t task_uart_tx_example(void)
   return TASK_FAILED;
 }
 
-static task_retval_t task_uart_rx_example(void)
+static task_retval_t task_uart_rx(void)
 {
   if(uart_rx_pending)
   {
@@ -201,22 +254,26 @@ static task_retval_t task_uart_rx_example(void)
 
       sscanf((char*)uart_rx_buff + 7, "%hu", &move_speed);
 
-      MOVIMIENTO_UART_CambiarEstado(estado, move_speed);
+      MOVIMIENTO_UART_CambiarEstado(estado, move_speed * PWM_CONVERSION);
     }
-
+    else if(strcmp((char*)uart_rx_buff, "CHANGE_MOVE_MODE") == 0)
+    {
+      movimiento_cambioModo_flag = 1;
+    }
+    else if(strcmp((char*)uart_rx_buff, "CHANGE_JOYSTICK") == 0)
+    {
+      movimiento_joystickCambioModo_flag = 1;
+    }
     uart_rx_pending = 0;
   }
   return TASK_OK;
 }
 
-static task_retval_t task_movement_example(void)
+static task_retval_t task_movement(void)
 {
-
   MOVIMIENTO_Actualizar();
-
   return TASK_OK;
 }
-
 
 
 static void scheduler_error_handler(void)
@@ -240,11 +297,13 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
   task_t tasks[NUM_TASKS] = {
-    {task_polling_buttons, 5U, 0},
-    {task_uart_tx_example, 1050U, 0},
-    {task_uart_rx_example, 10U, 0},
-    {task_movement_example, 1U, 0},
+      {task_movement, 1U, 0},
+      {task_uart_tx, 100U, 0},
+      {task_uart_rx, 50U, 0},
+      {task_adc, 5U, 0},
+      {task_polling_buttons, 5U, 0},
   };
 
   /* USER CODE END 1 */
@@ -281,6 +340,11 @@ int main(void)
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
   PULSADOR_Init(&b1, PULSADOR_B1_REGISTRO, PULSADOR_B1_BIT);
   PULSADOR_Init(&bj, PULSADOR_BJ_REGISTRO, PULSADOR_BJ_BIT);
+
+
+  memset((uint8_t*)adc_dma_buffer, 0, ADC_BUFFER_SIZE*sizeof(adc_dma_buffer[0]));
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, ADC_BUFFER_SIZE);
+  HAL_TIM_Base_Start(&htim2);
 
   /* USER CODE END 2 */
 
@@ -787,17 +851,11 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LED2_Pin|LED3_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : BC_Pin */
-  GPIO_InitStruct.Pin = BC_Pin;
+  /*Configure GPIO pins : B1_Pin BC_Pin */
+  GPIO_InitStruct.Pin = B1_Pin|BC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(BC_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : BUZ_Pin LED1_Pin */
   GPIO_InitStruct.Pin = BUZ_Pin|LED1_Pin;

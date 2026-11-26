@@ -16,17 +16,21 @@ extern volatile uint8_t movimiento_uartTimeout_flag;
 
 uint8_t movimiento_joystickCambioModo_flag = 0U;
 uint8_t movimiento_cambioModo_flag = 0U;
-
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 
 uint8_t movimiento_uartComando_flag = 0U;
 uart_estado_t uart_estado_siguiente = UART_PARADO;
-uint8_t uart_velocidad_movimiento = 0U;
+uint16_t uart_velocidad_movimiento = 0U;
 
 static movimiento_estado_t mov_estado = MOVIMIENTO_INIT;
 static uart_estado_t uart_estado_actual = UART_PARADO;
 static joystick_estado_t joystick_estado = JOYSTICK_GIRO;
+
+static int16_t joystick_x;
+static int16_t joystick_y;
+#define JOYSTICK_DEADZONE 100
+#define JOYSTICK_CENTER 2100
 
 static motor_t motor_superior_izquierda;
 static motor_t motor_inferior_izquierda;
@@ -38,14 +42,34 @@ static void UART_Actualizar();
 static void JOYSTICK_Actualizar();
 static void MOVIMIENTO_InitMotores();
 static void MOVIMIENTO_PararMotores();
-static void MOVIMIENTO_EntryUart();
+static inline void MOVIMIENTO_EntryUart();
 static void MOVIMIENTO_EntryColision();
-
 
 movimiento_estado_t MOVIMIENTO_Get_movimiento_estado() { return mov_estado; }
 uart_estado_t MOVIMIENTO_Get_uart_estado() { return uart_estado_actual; }
 joystick_estado_t MOVIMIENTO_Get_joystick_estado() { return joystick_estado; }
 
+int16_t MOVIMIENTO_Get_Joystick_X() { return joystick_x; }
+int16_t MOVIMIENTO_Get_Joystick_Y() { return joystick_y; }
+
+static int16_t joystick_conversion(uint16_t original)
+{
+  int16_t ret = JOYSTICK_CENTER - original;
+
+  if(ret > JOYSTICK_DEADZONE || -ret > JOYSTICK_DEADZONE)
+    return ret;
+
+  return 0;
+}
+
+void MOVIMIENTO_Set_Joystick_X(uint16_t valor)
+{
+  joystick_x = joystick_conversion(valor);
+}
+void MOVIMIENTO_Set_Joystick_Y(uint16_t valor)
+{
+  joystick_y = joystick_conversion(valor);
+}
 
 /*!
 * @brief Actualiza la maquina de estados del movimiento del coche.
@@ -66,22 +90,23 @@ void MOVIMIENTO_Actualizar()
       // Acciones al salir del estado UART
       uart_estado_siguiente = UART_PARADO;
       UART_Entrar();
+    }
 
-      if(movimiento_cambioModo_flag == 1)
-      {
-        HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
-        movimiento_cambioModo_flag = 0;
-        mov_estado = MOVIMIENTO_JOYSTICK;
-      }
-      else
-      {
-        UART_Actualizar();
-      }
-      if(movimiento_colision_flag == 1)
-      {
-        MOVIMIENTO_EntryColision();
-      }
+    if(movimiento_cambioModo_flag == 1)
+    {
+      HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+      movimiento_cambioModo_flag = 0;
+      mov_estado = MOVIMIENTO_JOYSTICK;
+    }
+    else
+    {
+      UART_Actualizar();
+    }
+
+    if(movimiento_colision_flag == 1)
+    {
+      MOVIMIENTO_EntryColision();
     }
     break;
 
@@ -93,21 +118,22 @@ void MOVIMIENTO_Actualizar()
       joystick_estado = JOYSTICK_GIRO;
       JOYSTICK_Actualizar();
       MOVIMIENTO_PararMotores();
+    }
 
-      if(movimiento_cambioModo_flag == 1)
-      {
-        MOVIMIENTO_EntryUart();
-        movimiento_cambioModo_flag = 0;
-        mov_estado = MOVIMIENTO_UART;
-      }
-      else
-      {
-        JOYSTICK_Actualizar();
-      }
-      if(movimiento_colision_flag == 1)
-      {
-        MOVIMIENTO_EntryColision();
-      }
+    if(movimiento_cambioModo_flag == 1)
+    {
+      MOVIMIENTO_EntryUart();
+      movimiento_cambioModo_flag = 0;
+      mov_estado = MOVIMIENTO_UART;
+    }
+    else
+    {
+      JOYSTICK_Actualizar();
+    }
+
+    if(movimiento_colision_flag == 1)
+    {
+      MOVIMIENTO_EntryColision();
     }
     break;
 
@@ -229,11 +255,50 @@ static void UART_Actualizar()
   }
 }
 
-void MOVIMIENTO_UART_CambiarEstado(uart_estado_t nuevo, uint8_t speed)
+void MOVIMIENTO_UART_CambiarEstado(uart_estado_t nuevo, uint16_t speed)
 {
   movimiento_uartComando_flag = 1;
   uart_estado_siguiente = nuevo;
   uart_velocidad_movimiento = speed;
+}
+
+void convertir_ADC_a_PWM(int16_t vy, int16_t vx, int16_t omega)
+{
+  //fl = front left
+  //fr = front right
+  //rl = rear left
+  //rr = rear right
+
+  int16_t fl = vy + vx + omega;
+  int16_t fr = vy - vx - omega;
+  int16_t rl = vy - vx + omega;
+  int16_t rr = vy + vx - omega;
+
+  int16_t max_val = 4900;
+  int16_t abs_fl = fl < 0 ? -fl : fl;
+  int16_t abs_fr = fr < 0 ? -fr : fr;
+  int16_t abs_rl = rl < 0 ? -rl : rl;
+  int16_t abs_rr = rr < 0 ? -rr : rr;
+
+  int16_t peak = abs_fl;
+  if(abs_fr > peak) peak = abs_fr;
+  if(abs_rl > peak) peak = abs_rl;
+  if(abs_rr > peak) peak = abs_rr;
+
+  if(peak > max_val)
+  {
+    fl = fl * max_val / peak;
+    fr = fr * max_val / peak;
+    rl = rl * max_val / peak;
+    rr = rr * max_val / peak;
+  }
+
+  //LOGS
+
+  MOTOR_update(&motor_superior_izquierda, fl > 0 ? fl : -fl, fl > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
+  MOTOR_update(&motor_superior_derecha,   fr > 0 ? fr : -fr, fr > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
+  MOTOR_update(&motor_inferior_izquierda, rl > 0 ? rl : -rl, rl > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
+  MOTOR_update(&motor_inferior_derecha,   rr > 0 ? rr : -rr, rr > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
 }
 
 static void JOYSTICK_Actualizar()
@@ -258,9 +323,11 @@ static void JOYSTICK_Actualizar()
   {
   case JOYSTICK_GIRO:
     // COMPLETAR: mover el coche en modo giro en funcion de la entrada del joystick
+    convertir_ADC_a_PWM(joystick_y*2, 0, joystick_x*2);
     break;
   case JOYSTICK_DIAGONAL:
     // COMPLETAR: mover el coche en modo diagonal en funcion de la entrada del joystick
+    convertir_ADC_a_PWM(joystick_y*2, joystick_x*2, 0); //MOVER ESTO AL DIAGONAL !!!!
     break;
   default:
     joystick_estado = JOYSTICK_GIRO;
@@ -293,7 +360,7 @@ static void MOVIMIENTO_EntryColision()
   mov_estado = MOVIMIENTO_COLISION;
 }
 
-static void MOVIMIENTO_EntryUart()
+static inline void MOVIMIENTO_EntryUart()
 {
   HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
