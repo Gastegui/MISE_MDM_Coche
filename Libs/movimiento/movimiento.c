@@ -44,6 +44,11 @@ extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 
+//Buzzer
+#define BUZZER_COLISION_PERIOD 250U
+#define BUZZER_BACKWARDS_PERIOD 500U
+static uint32_t buzzer_last_time = 0;
+
 static void UART_Entrar();
 static void UART_Actualizar();
 static void JOYSTICK_Actualizar();
@@ -95,6 +100,7 @@ void MOVIMIENTO_Actualizar()
     if(movimiento_cambioModo_flag == 1 || movimiento_colision_flag == 1)
     {
       // Acciones al salir del estado UART
+      HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
       uart_estado_siguiente = UART_PARADO;
       UART_Entrar();
     }
@@ -147,6 +153,7 @@ void MOVIMIENTO_Actualizar()
   case MOVIMIENTO_COLISION:
     if(movimiento_reset_flag == 1)
     {
+      HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
       MOVIMIENTO_EntryUart();
       movimiento_reset_flag = 0;
@@ -154,7 +161,11 @@ void MOVIMIENTO_Actualizar()
     }
     else
     {
-      // COMPLETAR: Activar el buzzer de alarma
+      if(HAL_GetTick() - buzzer_last_time >= BUZZER_COLISION_PERIOD)
+      {
+        HAL_GPIO_TogglePin(BUZ_GPIO_Port, BUZ_Pin);
+        buzzer_last_time = HAL_GetTick();
+      }
     }
     break;
 
@@ -258,7 +269,14 @@ static void UART_Actualizar()
     uart_estado_siguiente = UART_PARADO;
     UART_Entrar();
     movimiento_uartTimeout_flag = 0;
-
+  }
+  else if (uart_estado_actual == UART_ATRAS)
+  {
+    if(HAL_GetTick() - buzzer_last_time >= BUZZER_BACKWARDS_PERIOD)
+    {
+      HAL_GPIO_TogglePin(BUZ_GPIO_Port, BUZ_Pin);
+      buzzer_last_time = HAL_GetTick();
+    }
   }
 }
 
