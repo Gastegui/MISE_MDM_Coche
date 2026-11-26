@@ -851,11 +851,17 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LED2_Pin|LED3_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : B1_Pin BC_Pin */
-  GPIO_InitStruct.Pin = B1_Pin|BC_Pin;
+  /*Configure GPIO pin : B1_Pin */
+  GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BC_Pin */
+  GPIO_InitStruct.Pin = BC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(BC_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : BUZ_Pin LED1_Pin */
   GPIO_InitStruct.Pin = BUZ_Pin|LED1_Pin;
