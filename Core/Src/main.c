@@ -156,7 +156,8 @@ void EXTI0_IRQHandler(void)
   if(EXTI->PR & 1U << 0)
   {
     EXTI->PR |= 1U << 0; //La flag se borra con un write
-    movimiento_colision_flag = 1;
+    if(MOVIMIENTO_Get_movimiento_estado() != MOVIMIENTO_COLISION)
+      movimiento_colision_flag = 1;
   }
 }
 
@@ -231,7 +232,7 @@ static task_retval_t task_uart_tx(void)
   return TASK_FAILED;
 }
 
-static task_retval_t task_uart_rx(void) //TODO: METER EL COMANDO DEL RESET DE LA COLISION
+static task_retval_t task_uart_rx(void)
 {
   if(uart_rx_pending)
   {
@@ -269,19 +270,23 @@ static task_retval_t task_uart_rx(void) //TODO: METER EL COMANDO DEL RESET DE LA
 
       sscanf((char*)uart_rx_buff + 7, "%hu", &move_speed);
 
-      MOVIMIENTO_UART_CambiarEstado(estado, move_speed * PWM_CONVERSION);
+      if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_UART)
+        MOVIMIENTO_UART_CambiarEstado(estado, move_speed * PWM_CONVERSION);
     }
     else if(strcmp((char*)uart_rx_buff, "CHANGE_MOVE_MODE") == 0)
     {
-      movimiento_cambioModo_flag = 1;
+      if(MOVIMIENTO_Get_movimiento_estado() != MOVIMIENTO_COLISION)
+        movimiento_cambioModo_flag = 1;
     }
     else if(strcmp((char*)uart_rx_buff, "CHANGE_JOYSTICK") == 0)
     {
-      movimiento_joystickCambioModo_flag = 1;
+      if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_JOYSTICK)
+        movimiento_joystickCambioModo_flag = 1;
     }
     else if(strcmp((char*)uart_rx_buff, "COLISION_RESET") == 0)
     {
-      movimiento_reset_flag = 1;
+      if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_COLISION)
+        movimiento_reset_flag = 1;
     }
     uart_rx_pending = 0;
   }
@@ -355,6 +360,32 @@ int main(void)
   MX_USART1_UART_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
+
+  if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != 0U)
+  {
+    char texto_watchdog[] = {"Watchdog got tripped\r\n"};
+    HAL_UART_Transmit(&huart2, (uint8_t *)texto_watchdog,
+            (uint16_t)strlen(texto_watchdog), HAL_MAX_DELAY);
+    char input[20];
+    strcpy(input, "");
+    while(1)
+    {
+      HAL_IWDG_Refresh(&hiwdg);
+      HAL_UART_Receive(&huart2, (uint8_t*)input, sizeof(input), 500);
+      HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+      if(strncmp(input, "RESUME", 6) == 0)
+        break;
+    }
+  }
+  else
+  {
+
+  }
+  /* borra las banderas para el próximo arranque */
+  __HAL_RCC_CLEAR_RESET_FLAGS();
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+
+
 
   //Activar el DMA del UART RX
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buff, sizeof(uart_rx_buff));
