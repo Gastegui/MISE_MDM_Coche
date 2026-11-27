@@ -1,6 +1,6 @@
 /** @file pulsador.c
 *
-* @brief A description of the module’s purpose.
+* @brief Pulsador control module.
 *
 */
 

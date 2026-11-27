@@ -48,7 +48,6 @@
 									<listOptionValue builtIn="false" value="../Libs/motor"/>
 									<listOptionValue builtIn="false" value="../Libs/movimiento"/>
 									<listOptionValue builtIn="false" value="../Libs/pulsador"/>
-									<listOptionValue builtIn="false" value="../Libs/uart"/>
 									<listOptionValue builtIn="false" value="../Drivers/STM32F4xx_HAL_Driver/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32F4xx/Include"/>
