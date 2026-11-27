@@ -75,13 +75,16 @@ TIM_HandleTypeDef htim5;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 
 //UART
 volatile uint8_t uart_rx_buff[20];
 volatile uint8_t uart_rx_pending = 0;
+char uart_tx_buff[100];
 
 //Movimiento
 extern volatile uint8_t movimiento_colision_flag;
@@ -229,12 +232,11 @@ static task_retval_t task_adc(void)
 
 static task_retval_t task_uart_tx(void)
 {
-  char mensaje[100];
-  snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %hu, Mov_uart_estado: %hu, Mov_Joy_estado: %hu, Joy_X: %i, Joy_Y: %i\r\n",
+  snprintf(uart_tx_buff, 100, "Tick: %lu, Mov_estado: %hu, Mov_uart_estado: %hu, Mov_Joy_estado: %hu, Joy_X: %i, Joy_Y: %i\r\n",
       HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_MovimientoEstado(), (uint8_t)MOVIMIENTO_Get_UartEstado(), (uint8_t)MOVIMIENTO_Get_JoystickEstado(),
       MOVIMIENTO_Get_Joystick_X(), MOVIMIENTO_Get_Joystick_Y());
 
-  if(HAL_UART_Transmit(USART_TO_USE, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
+  if(HAL_UART_Transmit_DMA(USART_TO_USE, (uint8_t*)uart_tx_buff, strlen(uart_tx_buff)) == HAL_OK)
     return TASK_OK;
 
   return TASK_FAILED;
@@ -332,7 +334,7 @@ int main(void)
 
   task_t tasks[NUM_TASKS] = {
       {task_movement, 1U, 0},
-      {task_uart_tx, 1000U, 0},
+      {task_uart_tx, 100U, 0},
       {task_uart_rx, 50U, 0},
       {task_adc, 5U, 0},
       {task_polling_buttons, 5U, 0},
@@ -883,12 +885,18 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
   /* DMA2_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
