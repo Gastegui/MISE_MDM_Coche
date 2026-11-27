@@ -33,10 +33,24 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include "motor.h"
 #include "movimiento.h"
+#include "pulsador.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+
+typedef enum
+{
+  TASK_OK,
+  TASK_FAILED
+}task_retval_t;
+
+typedef struct
+{
+  task_retval_t (*function)(void);
+  uint16_t period_ms;
+  uint32_t last_exec;
+} task_t;
 
 /* USER CODE END ET */
 
@@ -90,6 +104,12 @@ void Error_Handler(void);
 #define LED3_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+
+#define NUM_TASKS 5
+#define ADC_BUFFER_SIZE 100
+
+#define USART_TO_USE &huart2
+#define USART_DMA USART2
 
 /* USER CODE END Private defines */
 
