@@ -54,9 +54,9 @@ typedef enum
 void MOVIMIENTO_Actualizar();
 void MOVIMIENTO_UART_CambiarEstado(uart_estado_t nuevo, uint16_t speed);
 
-movimiento_estado_t MOVIMIENTO_Get_movimiento_estado();
-uart_estado_t MOVIMIENTO_Get_uart_estado();
-joystick_estado_t MOVIMIENTO_Get_joystick_estado();
+movimiento_estado_t MOVIMIENTO_Get_MovimientoEstado();
+uart_estado_t MOVIMIENTO_Get_UartEstado();
+joystick_estado_t MOVIMIENTO_Get_JoystickEstado();
 
 
 int16_t MOVIMIENTO_Get_Joystick_X();

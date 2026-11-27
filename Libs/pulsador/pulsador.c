@@ -1,3 +1,9 @@
+/** @file pulsador.c
+*
+* @brief A description of the module’s purpose.
+*
+*/
+
 #include "pulsador.h"
 
 void PULSADOR_Init(pulsador_t *p, const volatile uint32_t *entrada, uint8_t bit)
@@ -76,3 +82,5 @@ uint8_t PULSADOR_Actualizar(pulsador_t *p)
     }
     return pulsacion;
 }
+
+/*** end of file ***/

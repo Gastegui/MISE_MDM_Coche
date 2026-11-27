@@ -13,19 +13,20 @@ typedef enum
 {
   MOTOR_FORWARD,
   MOTOR_BACKWARD
-}motor_direction;
+} motor_direction_t;
 
 typedef struct
 {
-  TIM_HandleTypeDef* timer;
+  TIM_HandleTypeDef * timer;
   uint8_t channel_forwards;
   uint8_t channel_backwards;
   uint16_t speed;
-  motor_direction direction;
-}motor_t;
+  motor_direction_t direction;
+} motor_t;
 
-void MOTOR_create(TIM_HandleTypeDef* timer, uint8_t channel_forwards, uint8_t channel_backwards, motor_t* output);
-
-void MOTOR_update(motor_t* motor, uint16_t speed, motor_direction direction);
+void MOTOR_Create(TIM_HandleTypeDef * timer, uint8_t channel_forwards, uint8_t channel_backwards, motor_t * output);
+void MOTOR_Update(motor_t * motor, uint16_t speed, motor_direction_t direction);
 
 #endif /* MOTOR_MOTOR_H */
+
+/*** end of file ***/

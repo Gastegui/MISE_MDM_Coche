@@ -161,7 +161,7 @@ void EXTI0_IRQHandler(void)
   if(EXTI->PR & 1U << 0)
   {
     EXTI->PR |= 1U << 0; //La flag se borra con un write
-    if(MOVIMIENTO_Get_movimiento_estado() != MOVIMIENTO_COLISION)
+    if(MOVIMIENTO_Get_MovimientoEstado() != MOVIMIENTO_COLISION)
       movimiento_colision_flag = 1;
   }
 }
@@ -172,7 +172,7 @@ static task_retval_t task_polling_buttons(void)
   peticion = PULSADOR_Actualizar(&b1);
   if(peticion == 1)
   {
-    if(MOVIMIENTO_Get_movimiento_estado() != MOVIMIENTO_COLISION)
+    if(MOVIMIENTO_Get_MovimientoEstado() != MOVIMIENTO_COLISION)
     {
       movimiento_cambioModo_flag = 1U;
     }
@@ -182,7 +182,7 @@ static task_retval_t task_polling_buttons(void)
   peticion = PULSADOR_Actualizar(&bj);
   if(peticion == 1)
   {
-    if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_JOYSTICK)
+    if(MOVIMIENTO_Get_MovimientoEstado() == MOVIMIENTO_JOYSTICK)
     {
       movimiento_joystickCambioModo_flag = 1U;
     }
@@ -231,7 +231,7 @@ static task_retval_t task_uart_tx(void)
 {
   char mensaje[100];
   snprintf(mensaje, 100, "Tick: %lu, Mov_estado: %hu, Mov_uart_estado: %hu, Mov_Joy_estado: %hu, Joy_X: %i, Joy_Y: %i\r\n",
-      HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_movimiento_estado(), (uint8_t)MOVIMIENTO_Get_uart_estado(), (uint8_t)MOVIMIENTO_Get_joystick_estado(),
+      HAL_GetTick(), (uint8_t)MOVIMIENTO_Get_MovimientoEstado(), (uint8_t)MOVIMIENTO_Get_UartEstado(), (uint8_t)MOVIMIENTO_Get_JoystickEstado(),
       MOVIMIENTO_Get_Joystick_X(), MOVIMIENTO_Get_Joystick_Y());
 
   if(HAL_UART_Transmit(USART_TO_USE, (uint8_t*)mensaje, strlen(mensaje), HAL_MAX_DELAY) == HAL_OK)
@@ -278,22 +278,22 @@ static task_retval_t task_uart_rx(void)
 
       sscanf((char*)uart_rx_buff + 7, "%hu", &move_speed);
 
-      if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_UART)
+      if(MOVIMIENTO_Get_MovimientoEstado() == MOVIMIENTO_UART)
         MOVIMIENTO_UART_CambiarEstado(estado, move_speed * PWM_CONVERSION);
     }
     else if(strncmp((char*)uart_rx_buff, "CHANGE_MOVE_MODE", 16) == 0)
     {
-      if(MOVIMIENTO_Get_movimiento_estado() != MOVIMIENTO_COLISION)
+      if(MOVIMIENTO_Get_MovimientoEstado() != MOVIMIENTO_COLISION)
         movimiento_cambioModo_flag = 1;
     }
     else if(strncmp((char*)uart_rx_buff, "CHANGE_JOYSTICK", 15) == 0)
     {
-      if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_JOYSTICK)
+      if(MOVIMIENTO_Get_MovimientoEstado() == MOVIMIENTO_JOYSTICK)
         movimiento_joystickCambioModo_flag = 1;
     }
     else if(strncmp((char*)uart_rx_buff, "COLISION_RESET", 14) == 0)
     {
-      if(MOVIMIENTO_Get_movimiento_estado() == MOVIMIENTO_COLISION)
+      if(MOVIMIENTO_Get_MovimientoEstado() == MOVIMIENTO_COLISION)
         movimiento_reset_flag = 1;
     }
     uart_rx_pending = 0;

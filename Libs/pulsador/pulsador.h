@@ -1,3 +1,9 @@
+/** @file pulsador.h
+*
+* @brief A description of the module’s purpose.
+*
+*/
+
 #ifndef PULSADOR_H
 #define PULSADOR_H
 
@@ -29,3 +35,5 @@ void PULSADOR_Init(pulsador_t *p, const volatile uint32_t *entrada, uint8_t bit)
 uint8_t PULSADOR_Actualizar(pulsador_t *p);
 
 #endif
+
+/*** end of file ***/

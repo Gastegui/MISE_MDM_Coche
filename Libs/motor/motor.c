@@ -9,20 +9,12 @@
 #include "main.h"
 #include "motor.h"
 
-static inline void stop_pwm(TIM_HandleTypeDef* timer, uint8_t channel)
-{
-  __HAL_TIM_SetCompare(timer, channel, 0);
-  HAL_TIM_PWM_Stop(timer, channel);
-}
+// Funciones privadas
+static inline void MOTOR_Stop_Pwm(TIM_HandleTypeDef * timer, uint8_t channel);
+static inline void MOTOR_Set_Pwm(TIM_HandleTypeDef * timer, uint8_t channel, uint16_t pulse);
 
-static inline void set_pwm(TIM_HandleTypeDef* timer, uint8_t channel, uint16_t pulse)
-{
-    __HAL_TIM_SetCompare(timer, channel, pulse);
-    __HAL_TIM_SetCounter(timer, 0);
-    HAL_TIM_PWM_Start(timer, channel);
-}
 
-void MOTOR_create(TIM_HandleTypeDef* timer, uint8_t channel_forwards, uint8_t channel_backwards, motor_t* output)
+void MOTOR_Create(TIM_HandleTypeDef * timer, uint8_t channel_forwards, uint8_t channel_backwards, motor_t * output)
 {
   output->timer = timer;
   output->channel_forwards = channel_forwards;
@@ -30,27 +22,40 @@ void MOTOR_create(TIM_HandleTypeDef* timer, uint8_t channel_forwards, uint8_t ch
   output->speed = 0;
   output->direction = 0;
 
-  stop_pwm(timer, channel_forwards);
-  stop_pwm(timer, channel_backwards);
+  MOTOR_Stop_Pwm(timer, channel_forwards);
+  MOTOR_Stop_Pwm(timer, channel_backwards);
 }
 
-void MOTOR_update(motor_t* motor, uint16_t speed, motor_direction direction)
+void MOTOR_Update(motor_t * motor, uint16_t speed, motor_direction_t direction)
 {
   if(motor->speed == speed && motor->direction == direction)
     return;
 
   if(direction == MOTOR_FORWARD)
   {
-    stop_pwm(motor->timer, motor->channel_backwards);
-    set_pwm(motor->timer, motor->channel_forwards, speed);
+    MOTOR_Stop_Pwm(motor->timer, motor->channel_backwards);
+    MOTOR_Set_Pwm(motor->timer, motor->channel_forwards, speed);
   }
   else
   {
-    stop_pwm(motor->timer, motor->channel_forwards);
-    set_pwm(motor->timer, motor->channel_backwards, speed);
+    MOTOR_Stop_Pwm(motor->timer, motor->channel_forwards);
+    MOTOR_Set_Pwm(motor->timer, motor->channel_backwards, speed);
   }
 
   motor->speed = speed;
   motor->direction = direction;
   return;
+}
+
+static inline void MOTOR_Stop_Pwm(TIM_HandleTypeDef * timer, uint8_t channel)
+{
+  __HAL_TIM_SetCompare(timer, channel, 0);
+  HAL_TIM_PWM_Stop(timer, channel);
+}
+
+static inline void MOTOR_Set_Pwm(TIM_HandleTypeDef * timer, uint8_t channel, uint16_t pulse)
+{
+    __HAL_TIM_SetCompare(timer, channel, pulse);
+    __HAL_TIM_SetCounter(timer, 0);
+    HAL_TIM_PWM_Start(timer, channel);
 }

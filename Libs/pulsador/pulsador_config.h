@@ -1,3 +1,9 @@
+/** @file pulsador_config.h
+*
+* @brief A description of the module’s purpose.
+*
+*/
+
 #ifndef PULSADOR_CONFIG_H
 #define PULSADOR_CONFIG_H
 
@@ -19,3 +25,5 @@
 #define PULSADOR_B1_BIT         13U
 
 #endif
+
+/*** end of file ***/

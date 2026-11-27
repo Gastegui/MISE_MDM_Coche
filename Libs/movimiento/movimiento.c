@@ -10,32 +10,32 @@
 #include "main.h"
 #include <stdint.h>
 
-//Flags desde interrupciones
+// Flags desde interrupciones
 volatile uint8_t movimiento_colision_flag;
 volatile uint8_t movimiento_uartTimeout_flag;
 
-//Flags desde comandos de UART o botones sin interrupción
+// Flags desde comandos de UART o botones sin interrupción
 uint8_t movimiento_reset_flag;
 uint8_t movimiento_joystickCambioModo_flag = 0U;
 uint8_t movimiento_cambioModo_flag = 0U;
 uint8_t movimiento_uartComando_flag = 0U;
 
-//Comandos del UART
+// Comandos del UART
 uart_estado_t uart_estado_siguiente = UART_PARADO;
 uint16_t uart_velocidad_movimiento = 0U;
 
-//Estados de las máquinas de estados
+// Estados de las máquinas de estados
 static movimiento_estado_t mov_estado = MOVIMIENTO_INIT;
 static uart_estado_t uart_estado_actual = UART_PARADO;
 static joystick_estado_t joystick_estado = JOYSTICK_GIRO;
 
-//Valores de los joysticks
+// Valores de los joysticks
 static int16_t joystick_x;
 static int16_t joystick_y;
 #define JOYSTICK_DEADZONE 100
 #define JOYSTICK_CENTER 2100
 
-//Motores y PWM
+// Motores y PWM
 static motor_t motor_superior_izquierda;
 static motor_t motor_inferior_izquierda;
 static motor_t motor_inferior_derecha;
@@ -44,43 +44,35 @@ extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 
-//Buzzer
+// Buzzer
 #define BUZZER_COLISION_PERIOD 250U
 #define BUZZER_BACKWARDS_PERIOD 400U
 static uint32_t buzzer_last_time = 0;
 
+// Funciones privadas
 static void UART_Entrar();
 static void UART_Actualizar();
 static void JOYSTICK_Actualizar();
+static int16_t JOYSTICK_Conversion(uint16_t original);
 static void MOVIMIENTO_InitMotores();
 static void MOVIMIENTO_PararMotores();
 static inline void MOVIMIENTO_EntryUart();
 static void MOVIMIENTO_EntryColision();
 
-movimiento_estado_t MOVIMIENTO_Get_movimiento_estado() { return mov_estado; }
-uart_estado_t MOVIMIENTO_Get_uart_estado() { return uart_estado_actual; }
-joystick_estado_t MOVIMIENTO_Get_joystick_estado() { return joystick_estado; }
 
+movimiento_estado_t MOVIMIENTO_Get_MovimientoEstado() { return mov_estado; }
+uart_estado_t MOVIMIENTO_Get_UartEstado() { return uart_estado_actual; }
+joystick_estado_t MOVIMIENTO_Get_JoystickEstado() { return joystick_estado; }
 int16_t MOVIMIENTO_Get_Joystick_X() { return joystick_x; }
 int16_t MOVIMIENTO_Get_Joystick_Y() { return joystick_y; }
 
-static int16_t joystick_conversion(uint16_t original)
-{
-  int16_t ret = JOYSTICK_CENTER - original;
-
-  if(ret > JOYSTICK_DEADZONE || -ret > JOYSTICK_DEADZONE)
-    return ret;
-
-  return 0;
-}
-
 void MOVIMIENTO_Set_Joystick_X(uint16_t valor)
 {
-  joystick_x = joystick_conversion(valor);
+  joystick_x = JOYSTICK_Conversion(valor);
 }
 void MOVIMIENTO_Set_Joystick_Y(uint16_t valor)
 {
-  joystick_y = joystick_conversion(valor);
+  joystick_y = JOYSTICK_Conversion(valor);
 }
 
 /*!
@@ -230,27 +222,27 @@ static void UART_Entrar()
   {
     //Motor superior izquierda
     if(movimiento.forward || movimiento.right || movimiento.tank_right)
-      MOTOR_update(&motor_superior_izquierda, uart_velocidad_movimiento, MOTOR_FORWARD);
+      MOTOR_Update(&motor_superior_izquierda, uart_velocidad_movimiento, MOTOR_FORWARD);
     else
-      MOTOR_update(&motor_superior_izquierda, uart_velocidad_movimiento, MOTOR_BACKWARD);
+      MOTOR_Update(&motor_superior_izquierda, uart_velocidad_movimiento, MOTOR_BACKWARD);
 
     //Motor superior derecha
     if(movimiento.forward || movimiento.left || movimiento.tank_left)
-      MOTOR_update(&motor_superior_derecha, uart_velocidad_movimiento, MOTOR_FORWARD);
+      MOTOR_Update(&motor_superior_derecha, uart_velocidad_movimiento, MOTOR_FORWARD);
     else
-      MOTOR_update(&motor_superior_derecha, uart_velocidad_movimiento, MOTOR_BACKWARD);
+      MOTOR_Update(&motor_superior_derecha, uart_velocidad_movimiento, MOTOR_BACKWARD);
 
     //Motor inferior izquierda
     if(movimiento.forward || movimiento.left || movimiento.tank_right)
-      MOTOR_update(&motor_inferior_izquierda, uart_velocidad_movimiento, MOTOR_FORWARD);
+      MOTOR_Update(&motor_inferior_izquierda, uart_velocidad_movimiento, MOTOR_FORWARD);
     else
-      MOTOR_update(&motor_inferior_izquierda, uart_velocidad_movimiento, MOTOR_BACKWARD);
+      MOTOR_Update(&motor_inferior_izquierda, uart_velocidad_movimiento, MOTOR_BACKWARD);
 
     //Motor inferior derecha
     if(movimiento.forward || movimiento.right || movimiento.tank_left)
-      MOTOR_update(&motor_inferior_derecha, uart_velocidad_movimiento, MOTOR_FORWARD);
+      MOTOR_Update(&motor_inferior_derecha, uart_velocidad_movimiento, MOTOR_FORWARD);
     else
-      MOTOR_update(&motor_inferior_derecha, uart_velocidad_movimiento, MOTOR_BACKWARD);
+      MOTOR_Update(&motor_inferior_derecha, uart_velocidad_movimiento, MOTOR_BACKWARD);
   }
 }
 
@@ -323,10 +315,10 @@ void convertir_ADC_a_PWM(int16_t vy, int16_t vx, int16_t omega)
 
   //LOGS
 
-  MOTOR_update(&motor_superior_izquierda, fl > 0 ? fl : -fl, fl > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
-  MOTOR_update(&motor_superior_derecha,   fr > 0 ? fr : -fr, fr > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
-  MOTOR_update(&motor_inferior_izquierda, rl > 0 ? rl : -rl, rl > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
-  MOTOR_update(&motor_inferior_derecha,   rr > 0 ? rr : -rr, rr > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
+  MOTOR_Update(&motor_superior_izquierda, fl > 0 ? fl : -fl, fl > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
+  MOTOR_Update(&motor_superior_derecha,   fr > 0 ? fr : -fr, fr > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
+  MOTOR_Update(&motor_inferior_izquierda, rl > 0 ? rl : -rl, rl > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
+  MOTOR_Update(&motor_inferior_derecha,   rr > 0 ? rr : -rr, rr > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
 }
 
 static void JOYSTICK_Actualizar()
@@ -363,20 +355,30 @@ static void JOYSTICK_Actualizar()
   }
 }
 
+static int16_t JOYSTICK_Conversion(uint16_t original)
+{
+  int16_t ret = JOYSTICK_CENTER - original;
+
+  if(ret > JOYSTICK_DEADZONE || -ret > JOYSTICK_DEADZONE)
+    return ret;
+
+  return 0;
+}
+
 static void MOVIMIENTO_InitMotores()
 {
-  MOTOR_create(&htim3, TIM_CHANNEL_1, TIM_CHANNEL_2, &motor_superior_izquierda);
-  MOTOR_create(&htim3, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_inferior_izquierda);
-  MOTOR_create(&htim4, TIM_CHANNEL_2, TIM_CHANNEL_1, &motor_inferior_derecha);
-  MOTOR_create(&htim4, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_superior_derecha);
+  MOTOR_Create(&htim3, TIM_CHANNEL_1, TIM_CHANNEL_2, &motor_superior_izquierda);
+  MOTOR_Create(&htim3, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_inferior_izquierda);
+  MOTOR_Create(&htim4, TIM_CHANNEL_2, TIM_CHANNEL_1, &motor_inferior_derecha);
+  MOTOR_Create(&htim4, TIM_CHANNEL_4, TIM_CHANNEL_3, &motor_superior_derecha);
 }
 
 static void MOVIMIENTO_PararMotores()
 {
-  MOTOR_update(&motor_superior_izquierda, 0, MOTOR_FORWARD);
-  MOTOR_update(&motor_superior_derecha, 0, MOTOR_FORWARD);
-  MOTOR_update(&motor_inferior_izquierda, 0, MOTOR_FORWARD);
-  MOTOR_update(&motor_inferior_derecha, 0, MOTOR_FORWARD);
+  MOTOR_Update(&motor_superior_izquierda, 0, MOTOR_FORWARD);
+  MOTOR_Update(&motor_superior_derecha, 0, MOTOR_FORWARD);
+  MOTOR_Update(&motor_inferior_izquierda, 0, MOTOR_FORWARD);
+  MOTOR_Update(&motor_inferior_derecha, 0, MOTOR_FORWARD);
 }
 
 static void MOVIMIENTO_EntryColision()
