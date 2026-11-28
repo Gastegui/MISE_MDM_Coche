@@ -1,8 +1,12 @@
-/** @file pulsador_config.h
-*
-* @brief A description of the module’s purpose.
-*
-*/
+/**
+ * @file pulsador_config.h
+ *
+ * @brief Hardware-specific configuration for the button module.
+ *
+ * @details Contains the MCU-dependent register, pin and time-source settings
+ *          used by the portable button-control implementation. Update this
+ *          file when adapting the library to a different board.
+ */
 
 #ifndef PULSADOR_CONFIG_H
 #define PULSADOR_CONFIG_H

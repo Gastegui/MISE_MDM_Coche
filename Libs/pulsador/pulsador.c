@@ -1,11 +1,21 @@
-/** @file pulsador.c
-*
-* @brief Pulsador control module.
-*
-*/
+/**
+ * @file pulsador.c
+ *
+ * @brief Debounced button input implementation.
+ *
+ * @details Implements a polling state machine that filters unstable press and
+ *          release transitions using the configured debounce interval.
+ */
 
 #include "pulsador.h"
 
+/**
+ * @brief Initializes a button instance.
+ *
+ * @param[out] p       Button instance to initialize.
+ * @param[in]  entrada Pointer to the GPIO input register.
+ * @param[in]  bit     Button bit index in the input register.
+ */
 void PULSADOR_Init(pulsador_t *p, const volatile uint32_t *entrada, uint8_t bit)
 {
     p->entrada = entrada;
@@ -14,7 +24,17 @@ void PULSADOR_Init(pulsador_t *p, const volatile uint32_t *entrada, uint8_t bit)
     p->t_inicio = 0U;
 }
 
-/* Devuelve 1 una sola vez por pulsación, cuando ya no hay rebote */
+/**
+ * @brief Polls a button and reports a debounced press event.
+ *
+ * @details Samples the active-low GPIO input and advances the debounce state
+ *          machine. A confirmed press produces a one-call event; button
+ *          releases are also debounced before a subsequent press is accepted.
+ *
+ * @param[in,out] p  Button instance to sample and update.
+ *
+ * @return 1U once when a press is confirmed; otherwise 0U.
+ */
 uint8_t PULSADOR_Actualizar(pulsador_t *p)
 {
     uint8_t pulsacion = 0U;
@@ -23,7 +43,7 @@ uint8_t PULSADOR_Actualizar(pulsador_t *p)
 
     ahora = PULSADOR_TIEMPO_MS();
 
-    /* Botón a GND con pull-up: apretado = bit a 0 */
+    /** A button connected to ground with a pull-up is active-low. */
     if ((*(p->entrada) & (1U << p->bit)) == 0U)
     {
         apretado = 1U;
@@ -44,12 +64,12 @@ uint8_t PULSADOR_Actualizar(pulsador_t *p)
         {
             if (apretado == 1U)
             {
-                pulsacion = 1U;                     /* evento: pulsación confirmada */
+                pulsacion = 1U;
                 p->estado = PULSADOR_PULSADO;
             }
             else
             {
-                p->estado = PULSADOR_REPOSO;        /* era ruido */
+                p->estado = PULSADOR_REPOSO;
             }
         }
         break;
@@ -71,13 +91,13 @@ uint8_t PULSADOR_Actualizar(pulsador_t *p)
             }
             else
             {
-                p->estado = PULSADOR_PULSADO;       /* era rebote al soltar */
+                p->estado = PULSADOR_PULSADO;
             }
         }
         break;
 
     default:
-        p->estado = PULSADOR_REPOSO;        /* estado no previsto: al seguro */
+        p->estado = PULSADOR_REPOSO;
         break;
     }
     return pulsacion;

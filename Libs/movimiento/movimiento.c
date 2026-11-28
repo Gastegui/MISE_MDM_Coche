@@ -17,32 +17,35 @@
 #include "main.h"
 #include <stdint.h>
 
-// Flags from interrupts
+// Interrupt flags
 
 volatile uint8_t movimiento_colision_flag;
 volatile uint8_t movimiento_uartTimeout_flag;
 
-// Flags from UART commands or polling buttons
+// Flags from UART commands and polling buttons
 
 uint8_t movimiento_reset_flag;
 uint8_t movimiento_joystickCambioModo_flag = 0;
 uint8_t movimiento_cambioModo_flag = 0;
 uint8_t movimiento_uartComando_flag = 0;
 
-// UART commands
+// Pending UART commands
 
 uart_estado_t uart_estado_siguiente = UART_PARADO;
 uint16_t uart_velocidad_movimiento = 0;
 
-// State machine's states
+// Current state of the state machine
 
 static movimiento_estado_t mov_estado = MOVIMIENTO_INIT;
 static uart_estado_t uart_estado_actual = UART_PARADO;
 static joystick_estado_t joystick_estado = JOYSTICK_GIRO;
 
-// Joysticks values
+// Joysticks calibration
 
+/** @brief ADC readings within this range of center are treated as neutral. */
 #define JOYSTICK_DEADZONE 100
+
+/** @brief ADC reading corresponding to the joystick center. */
 #define JOYSTICK_CENTER 2100
 
 static int16_t joystick_x;
@@ -58,9 +61,12 @@ extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 
-// Buzzer
+// Buzzer timing
 
+/** @brief Buzzer toggle interval during collision mode, in milliseconds. */
 #define BUZZER_COLISION_PERIOD 250U
+
+/** @brief Buzzer toggle interval while moving backward, in milliseconds. */
 #define BUZZER_BACKWARDS_PERIOD 400U
 
 static uint32_t buzzer_last_time = 0;
@@ -170,7 +176,7 @@ void MOVIMIENTO_Actualizar()
   case MOVIMIENTO_UART:
     if(movimiento_cambioModo_flag == 1 || movimiento_colision_flag == 1)
     {
-      // UART state exit actions
+      /** Stop the buzzer and discard the active UART movement command. */
       HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
       uart_estado_siguiente = UART_PARADO;
       UART_Entrar();
@@ -197,7 +203,7 @@ void MOVIMIENTO_Actualizar()
   case MOVIMIENTO_JOYSTICK:
     if(movimiento_cambioModo_flag == 1 || movimiento_colision_flag == 1)
     {
-      // JOYSTICK state exit actions
+      /** Reset joystick mode and stop the motors before leaving this state. */
       movimiento_joystickCambioModo_flag = 1;
       joystick_estado = JOYSTICK_GIRO;
       JOYSTICK_Actualizar();
@@ -408,25 +414,25 @@ static void UART_Entrar()
   }
   else
   {
-    //Motor superior izquierda
+    /** Apply the command to the upper-left motor. */
     if(movimiento.forward || movimiento.right || movimiento.tank_right)
       MOTOR_Update(&motor_superior_izquierda, uart_velocidad_movimiento, MOTOR_FORWARD);
     else
       MOTOR_Update(&motor_superior_izquierda, uart_velocidad_movimiento, MOTOR_BACKWARD);
 
-    //Motor superior derecha
+    /** Apply the command to the upper-right motor. */
     if(movimiento.forward || movimiento.left || movimiento.tank_left)
       MOTOR_Update(&motor_superior_derecha, uart_velocidad_movimiento, MOTOR_FORWARD);
     else
       MOTOR_Update(&motor_superior_derecha, uart_velocidad_movimiento, MOTOR_BACKWARD);
 
-    //Motor inferior izquierda
+    /** Apply the command to the lower-left motor. */
     if(movimiento.forward || movimiento.left || movimiento.tank_right)
       MOTOR_Update(&motor_inferior_izquierda, uart_velocidad_movimiento, MOTOR_FORWARD);
     else
       MOTOR_Update(&motor_inferior_izquierda, uart_velocidad_movimiento, MOTOR_BACKWARD);
 
-    //Motor inferior derecha
+    /** Apply the command to the lower-right motor. */
     if(movimiento.forward || movimiento.right || movimiento.tank_left)
       MOTOR_Update(&motor_inferior_derecha, uart_velocidad_movimiento, MOTOR_FORWARD);
     else

@@ -15,7 +15,6 @@
 
 /* Types --------------------------------------------------------------------*/
 
-
 /**
  *
  * @brief Defines the possible rotation directions of the motor.

@@ -86,6 +86,13 @@ static void MX_IWDG_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/**
+ * @brief Handles timer period-elapsed events.
+ *
+ * @details Sets the UART timeout flag when TIM5 reaches its period.
+ *
+ * @param[in] htim  Timer handle that generated the event.
+ */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef * htim)
 {
     if (htim->Instance == TIM5)
@@ -94,16 +101,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef * htim)
     }
 }
 
+/**
+ * @brief Handles the external interrupt on line 0.
+ *
+ * @details Clears the pending interrupt and requests collision handling
+ *          unless the movement state machine is already in collision mode.
+ */
 void EXTI0_IRQHandler(void)
 {
   if(EXTI->PR & 1U << 0)
   {
-    EXTI->PR |= 1U << 0; //La flag se borra con un write
+    /** Clear the pending EXTI bit by writing one to it. */
+    EXTI->PR |= 1U << 0;
     if(MOVIMIENTO_Get_MovimientoEstado() != MOVIMIENTO_COLISION)
       movimiento_colision_flag = 1;
   }
 }
 
+/**
+ * @brief Reports a task failure and halts normal scheduler operation.
+ *
+ * @details Sends an error message, turns on the status LED and remains in a
+ *          watchdog-serviced loop.
+ */
 static void scheduler_error_handler(void)
 {
   char mensaje[] = {"Ha ocurrido un error\r\n"};
@@ -118,20 +138,25 @@ static void scheduler_error_handler(void)
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
+ * @brief Application entry point.
+ *
+ * @details Initializes the HAL, system clock and peripherals, handles
+ *          watchdog-reset recovery, initializes the application tasks and
+ *          runs the cooperative periodic scheduler.
+ *
+ * @return This function does not return.
+ */
 int main(void)
 {
 
   /* USER CODE BEGIN 1 */
 
   task_t tasks[NUM_TASKS] = {
-      {task_movement, 1U, 0},
-      {task_uart_tx, 100U, 0},
-      {task_uart_rx, 50U, 0},
-      {task_adc, 5U, 0},
-      {task_polling_buttons, 5U, 0},
+      {TASK_Movement, 1U, 0},
+      {TASK_UART_Tx, 100U, 0},
+      {TASK_UART_Rx, 50U, 0},
+      {TASK_ADC, 5U, 0},
+      {TASK_Polling_Buttons, 5U, 0},
   };
 
   /* USER CODE END 1 */
@@ -165,8 +190,8 @@ int main(void)
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
-  //Comprobar el motivo del inicio
-  if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != 0U) //Se ha reiniciado por el watchdog
+  /** Recover from a previous reset caused by the independent watchdog. */
+  if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != 0U)
   {
     char texto_watchdog[] = {"Watchdog got tripped\r\n"};
     HAL_UART_Transmit(USART_TO_USE, (uint8_t *)texto_watchdog,
@@ -182,22 +207,23 @@ int main(void)
         break;
     }
   }
-  else //Inicio normal
+  else
   {
 
   }
-  /* borra las banderas para el próximo arranque */
+  /** Clear reset flags so the next boot can identify its reset cause. */
   __HAL_RCC_CLEAR_RESET_FLAGS();
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET); //Apagar el LD2 del watchdog
+  /** Turn off the watchdog-reset indicator after reset handling. */
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
 
-  //Init de los tasks
+  /** Initialize the application task resources. */
 
-  task_adc_init();
-  task_pollig_buttons_init();
-  task_uart_rx_init();
+  TASK_ADC_Init();
+  TASK_Polling_Buttons_Init();
+  TASK_UART_Rx_Init();
 
-  //Activar la interrupción de las colisiones
+  /** Enable the external interrupt used to detect collisions. */
   NVIC_SetPriority(EXTI0_IRQn, 5);
   NVIC_EnableIRQ(EXTI0_IRQn);
 

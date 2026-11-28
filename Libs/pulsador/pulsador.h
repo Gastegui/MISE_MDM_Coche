@@ -1,35 +1,53 @@
-/** @file pulsador.h
-*
-* @brief A description of the module’s purpose.
-*
-*/
+/**
+ * @file pulsador.h
+ *
+ * @brief Public interface for debounced button input.
+ *
+ * @details Provides the button state type and functions to initialize a
+ *          button and poll it for debounced press events.
+ */
 
 #ifndef PULSADOR_H
 #define PULSADOR_H
 
+/* Includes -----------------------------------------------------------------*/
+
 #include <stdint.h>
 #include "pulsador_config.h"
 
-/* Tiempo que se deja pasar para que acabe el rebote */
+/* Defines ------------------------------------------------------------------*/
+
+/** @brief Debounce interval applied to both button presses and releases, in ms. */
 #define PULSADOR_MS_REBOTE  20U
 
-/* Los cuatro estados de la máquina */
+/* Types --------------------------------------------------------------------*/
+
+/**
+ * @brief States used by the button debounce state machine.
+ */
 typedef enum
 {
-    PULSADOR_REPOSO = 0,
-    PULSADOR_POSIBLE_PULSACION,
-    PULSADOR_PULSADO,
-    PULSADOR_POSIBLE_LIBERACION
+    PULSADOR_REPOSO = 0,             /**< Waiting for a possible press. */
+    PULSADOR_POSIBLE_PULSACION,      /**< Verifying that a press is stable. */
+    PULSADOR_PULSADO,                /**< Button press has been confirmed. */
+    PULSADOR_POSIBLE_LIBERACION      /**< Verifying that a release is stable. */
 } pulsador_estado_t;
 
-/* Cada pulsador guarda dónde está, su estado y cuándo entró en él */
+/**
+ * @brief Runtime data for one polled button.
+ *
+ * @details Stores the input register and bit to sample, the current debounce
+ *          state, and the timestamp at which that state was entered.
+ */
 typedef struct
 {
-    const volatile uint32_t *entrada;   /* registro de entrada del puerto */
-    uint8_t bit;                    /* número de bit del pulsador */
-    pulsador_estado_t estado;
-    uint32_t t_inicio;
+    const volatile uint32_t *entrada; /**< Pointer to the GPIO input register. */
+    uint8_t bit;                      /**< Button bit index in the input register. */
+    pulsador_estado_t estado;         /**< Current debounce state. */
+    uint32_t t_inicio;                /**< Tick when the current state began. */
 } pulsador_t;
+
+/* Public functions ---------------------------------------------------------*/
 
 void PULSADOR_Init(pulsador_t *p, const volatile uint32_t *entrada, uint8_t bit);
 uint8_t PULSADOR_Actualizar(pulsador_t *p);
