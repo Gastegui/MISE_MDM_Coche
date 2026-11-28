@@ -247,10 +247,15 @@ task_retval_t TASK_UART_Rx(void)
         break;
       }
 
-      sscanf((char*)uart_rx_buff + 7, "%hu", &move_speed);
+      if(strlen((char*)uart_rx_buff) > 7)
+      {
+        sscanf((char*)uart_rx_buff + 7, "%hu", &move_speed);
 
-      if(move_speed > 100)
-        move_speed = 100;
+        if(move_speed > 100)
+          move_speed = 100;
+      }
+      else
+        move_speed = 0;
 
       if(MOVIMIENTO_Get_MovimientoEstado() == MOVIMIENTO_UART)
         MOVIMIENTO_UART_CambiarEstado(estado, move_speed * PWM_CONVERSION);

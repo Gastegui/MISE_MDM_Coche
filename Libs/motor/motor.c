@@ -70,6 +70,10 @@ void MOTOR_Create(TIM_HandleTypeDef * timer, uint8_t channel_forwards,
 void MOTOR_Update(motor_t * motor, uint16_t speed,
                   motor_direction_t direction)
 {
+    /* Limit max speed */
+    if(speed > PWM_ARR)
+      speed = PWM_ARR;
+
     /* Avoid unnecessary PWM reconfiguration. */
     if ((motor->speed == speed) && (motor->direction == direction))
     {

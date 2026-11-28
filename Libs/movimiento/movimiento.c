@@ -76,9 +76,8 @@ static uint32_t buzzer_last_time = 0;
 static void UART_Entrar();
 static void UART_Actualizar();
 static void JOYSTICK_Actualizar();
-static int16_t JOYSTICK_Conversion(uint16_t original);
-static void JOYSTICK_Convertir_ADCaPWM(int16_t vy, int16_t vx,
-                                       int16_t omega);
+static inline int16_t JOYSTICK_Conversion(uint16_t original);
+static void JOYSTICK_Convertir_ADCaPWM(int16_t vy, int16_t vx, int16_t omega);
 static void MOVIMIENTO_InitMotores();
 static void MOVIMIENTO_PararMotores();
 static inline void MOVIMIENTO_EntryUart();
@@ -490,7 +489,7 @@ static void JOYSTICK_Actualizar()
  *
  * @return Centered joystick value, or zero inside the dead zone.
  */
-static int16_t JOYSTICK_Conversion(uint16_t original)
+static inline int16_t JOYSTICK_Conversion(uint16_t original)
 {
   int16_t ret = JOYSTICK_CENTER - original;
 
@@ -541,8 +540,6 @@ static void JOYSTICK_Convertir_ADCaPWM(int16_t vy, int16_t vx, int16_t omega)
     rl = rl * max_val / peak;
     rr = rr * max_val / peak;
   }
-
-  //LOGS
 
   MOTOR_Update(&motor_superior_izquierda, fl > 0 ? fl : -fl, fl > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
   MOTOR_Update(&motor_superior_derecha,   fr > 0 ? fr : -fr, fr > 0 ? MOTOR_FORWARD : MOTOR_BACKWARD);
